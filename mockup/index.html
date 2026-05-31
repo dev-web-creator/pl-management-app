@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PL管理 — モックアップ v2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: { colors: {
+    ink: '#0f172a', sub: '#64748b',
+    income: '#0ea5e9', fixed: '#6366f1', variable: '#f59e0b', profit: '#10b981', excl: '#94a3b8',
+  }}}}
+</script>
+<style>
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif; }
+  .tabular { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-slate-100 text-ink min-h-screen pb-24">
+
+<header class="bg-white border-b sticky top-0 z-20">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-ink text-white grid place-items-center font-bold text-sm">PL</div>
+      <span class="font-bold text-lg">My PL</span>
+    </div>
+    <div class="flex items-center gap-1 text-sm">
+      <button class="px-2 py-1 text-sub hover:text-ink">‹</button>
+      <span class="font-semibold tabular">FY2026 ・ 2026年 5月</span>
+      <button class="px-2 py-1 text-sub hover:text-ink">›</button>
+    </div>
+  </div>
+  <nav class="max-w-5xl mx-auto px-4 flex gap-1 text-sm overflow-x-auto">
+    <button onclick="showTab('dashboard')"    id="tab-dashboard"    class="tab px-3 py-2 border-b-2 border-ink font-semibold whitespace-nowrap">ダッシュボード</button>
+    <button onclick="showTab('yojitsu')"      id="tab-yojitsu"      class="tab px-3 py-2 border-b-2 border-transparent text-sub whitespace-nowrap">予実</button>
+    <button onclick="showTab('wallets')"      id="tab-wallets"      class="tab px-3 py-2 border-b-2 border-transparent text-sub whitespace-nowrap">ウォレット</button>
+    <button onclick="showTab('transactions')" id="tab-transactions" class="tab px-3 py-2 border-b-2 border-transparent text-sub whitespace-nowrap">取引一覧</button>
+  </nav>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-5 space-y-6">
+
+  <!-- ============ ダッシュボード ============ -->
+  <section id="view-dashboard" class="space-y-6">
+
+    <!-- PL カード -->
+    <div class="bg-white rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-sub mb-4">今月のPL（損益計算書）</h2>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="w-2 h-6 rounded bg-income"></span><span class="font-semibold">可処分所得（手取り・トップライン）</span></div>
+          <span class="text-xl font-bold tabular">¥473,000</span>
+        </div>
+        <div class="pl-4 text-xs text-sub tabular space-y-0.5">
+          <div>給与手取り ¥420,000（額面 ¥540,000 − 控除 ¥120,000）</div>
+          <div>副業・その他収益 ¥50,000 ／ ポイント収入 ¥3,000</div>
+        </div>
+        <div class="flex items-center justify-between text-excl text-sm pl-1 pt-1">
+          <div class="flex items-center gap-2"><span class="w-2 h-4 rounded bg-excl"></span><span>（PL対象外）経費精算 +¥12,000</span></div>
+          <span class="tabular text-xs">残高に反映・損益には含めず</span>
+        </div>
+        <hr class="my-1"/>
+        <div class="flex items-center justify-between text-fixed">
+          <div class="flex items-center gap-2"><span class="w-2 h-5 rounded bg-fixed"></span><span>− 固定費</span></div>
+          <span class="font-semibold tabular">¥174,690</span>
+        </div>
+        <div class="flex items-center justify-between text-variable">
+          <div class="flex items-center gap-2"><span class="w-2 h-5 rounded bg-variable"></span><span>− 変動費</span></div>
+          <span class="font-semibold tabular">¥129,000</span>
+        </div>
+        <hr class="my-1"/>
+        <div class="flex items-center justify-between bg-emerald-50 -mx-2 px-3 py-2 rounded-xl">
+          <div class="flex items-center gap-2"><span class="w-2 h-7 rounded bg-profit"></span><span class="font-bold">月次黒字（貯蓄に回る額）</span></div>
+          <span class="text-2xl font-extrabold text-profit tabular">¥169,310</span>
+        </div>
+        <div class="flex justify-end text-xs text-sub">貯蓄率 35.8% ・ 前月比 <span class="text-profit font-semibold ml-1">+¥9,400</span></div>
+      </div>
+    </div>
+
+    <!-- 収入の使い道バー -->
+    <div class="bg-white rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-sub mb-3">収入の使い道</h2>
+      <div class="flex h-5 rounded-full overflow-hidden text-[10px] text-white font-semibold">
+        <div class="bg-fixed grid place-items-center" style="width:36.9%">固定37%</div>
+        <div class="bg-variable grid place-items-center" style="width:27.3%">変動27%</div>
+        <div class="bg-profit grid place-items-center" style="width:35.8%">余剰36%</div>
+      </div>
+    </div>
+
+    <!-- 固定費 + 変動費 -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-2xl shadow-sm p-5">
+        <h2 class="text-sm font-semibold text-sub mb-4">固定費 内訳</h2>
+        <div id="fixed" class="space-y-1.5 text-sm"></div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-sub">変動費 内訳</h2>
+          <span class="text-lg font-bold text-variable tabular">¥129,000</span>
+        </div>
+        <div id="varTree" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- 資産サマリー -->
+    <div class="bg-white rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-sub mb-3">資産サマリー（5月末）</h2>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-slate-50 rounded-xl p-4 text-center">
+          <div class="text-xs text-sub mb-1">総資産</div>
+          <div class="text-2xl font-bold tabular">¥1,341,500</div>
+          <div class="text-xs text-sub mt-1">銀行 + プリペイド + ポイント</div>
+        </div>
+        <div class="bg-emerald-50 rounded-xl p-4 text-center">
+          <div class="text-xs text-sub mb-1">純資産</div>
+          <div class="text-2xl font-bold tabular text-profit">¥1,187,100</div>
+          <div class="text-xs text-sub mt-1">総資産 − カード未払い ¥154,400</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 予実 ============ -->
+  <section id="view-yojitsu" class="hidden space-y-6">
+
+    <!-- FY グリッド -->
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div class="p-5 pb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-sub">FY2026 予実（4月〜3月）</h2>
+        <div class="flex items-center gap-4 text-xs text-sub">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-800 inline-block"></span>確定済</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border border-slate-300 inline-block"></span>未確定（予算）</span>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs tabular min-w-[780px]">
+          <thead>
+            <tr class="bg-slate-50 text-sub border-b">
+              <th class="text-left px-4 py-2 font-medium w-20">区分</th>
+              <th class="text-right px-2 py-2 font-medium">4月<div class="text-[10px] font-normal text-slate-400">確定</div></th>
+              <th class="text-right px-2 py-2 font-medium">5月<div class="text-[10px] font-normal text-slate-400">確定</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">6月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">7月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">8月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">9月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">10月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">11月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">12月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">1月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">2月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-2 py-2 font-medium text-slate-400">3月<div class="text-[10px] font-normal">予算</div></th>
+              <th class="text-right px-4 py-2 font-medium">年間</th>
+            </tr>
+          </thead>
+          <tbody id="yojitsu-body" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 当月詳細 -->
+    <div class="bg-white rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-sub mb-4">5月 実績 vs 予算</h2>
+      <div class="space-y-4" id="yojitsu-detail"></div>
+    </div>
+  </section>
+
+  <!-- ============ ウォレット ============ -->
+  <section id="view-wallets" class="hidden space-y-6">
+
+    <!-- 総資産 / 純資産 -->
+    <div class="grid grid-cols-2 gap-4">
+      <div class="bg-ink text-white rounded-2xl shadow-sm p-4 text-center">
+        <div class="text-xs opacity-60 mb-1">総資産</div>
+        <div class="text-2xl font-bold tabular">¥1,341,500</div>
+        <div class="text-xs opacity-50 mt-0.5">銀行 + プリペイド + ポイント</div>
+      </div>
+      <div class="bg-emerald-600 text-white rounded-2xl shadow-sm p-4 text-center">
+        <div class="text-xs opacity-80 mb-1">純資産</div>
+        <div class="text-2xl font-bold tabular">¥1,187,100</div>
+        <div class="text-xs opacity-70 mt-0.5">カード未払い −¥154,400</div>
+      </div>
+    </div>
+
+    <!-- 銀行 -->
+    <div>
+      <h2 class="text-sm font-semibold text-sub mb-3 px-1">銀行口座</h2>
+      <div class="grid sm:grid-cols-2 gap-4" id="bank-cards"></div>
+    </div>
+
+    <!-- プリペイド -->
+    <div>
+      <h2 class="text-sm font-semibold text-sub mb-3 px-1">プリペイド・電子マネー</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="prepaid-cards"></div>
+    </div>
+
+    <!-- ポイント -->
+    <div>
+      <h2 class="text-sm font-semibold text-sub mb-3 px-1">ポイント（資産扱い）</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="points-cards"></div>
+    </div>
+
+    <!-- カード未払い -->
+    <div>
+      <h2 class="text-sm font-semibold text-sub mb-3 px-1">クレジットカード（未払い）</h2>
+      <div class="grid sm:grid-cols-3 gap-4" id="card-cards"></div>
+    </div>
+
+    <!-- 引き落とし予定 -->
+    <div class="bg-white rounded-2xl shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-sub mb-4">引き落とし予定（三井住友銀行から）</h2>
+      <div id="card-schedule" class="space-y-3"></div>
+    </div>
+  </section>
+
+  <!-- ============ 取引一覧 ============ -->
+  <section id="view-transactions" class="hidden">
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-sub text-xs">
+          <tr>
+            <th class="text-left px-3 py-2">日付</th>
+            <th class="text-left px-3 py-2">カテゴリ</th>
+            <th class="text-left px-3 py-2 hidden sm:table-cell">決済手段</th>
+            <th class="text-left px-3 py-2 hidden md:table-cell">メモ</th>
+            <th class="text-right px-3 py-2">金額</th>
+          </tr>
+        </thead>
+        <tbody id="tx-rows" class="divide-y"></tbody>
+      </table>
+    </div>
+    <p class="text-xs text-sub mt-2 px-1">※ グレー＝PL対象外（経費精算・借入等。残高には反映、損益には含めない）</p>
+  </section>
+
+</main>
+
+<!-- 入力ボタン -->
+<button onclick="openModal()" class="fixed bottom-6 right-6 z-30 bg-ink text-white rounded-full w-14 h-14 shadow-lg text-2xl grid place-items-center hover:scale-105 transition">＋</button>
+
+<!-- 入力モーダル -->
+<div id="modal" class="hidden fixed inset-0 z-40 bg-black/40 grid place-items-end sm:place-items-center" onclick="if(event.target===this)closeModal()">
+  <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between">
+      <h2 class="font-bold text-lg">取引を入力</h2>
+      <button onclick="closeModal()" class="text-sub text-2xl leading-none">×</button>
+    </div>
+    <div class="flex gap-2 text-sm">
+      <button id="btn-expense"  onclick="setType('expense')"  class="flex-1 py-2 rounded-lg bg-ink text-white font-semibold">支出</button>
+      <button id="btn-income"   onclick="setType('income')"   class="flex-1 py-2 rounded-lg bg-slate-100 text-sub">収入</button>
+      <button id="btn-transfer" onclick="setType('transfer')" class="flex-1 py-2 rounded-lg bg-slate-100 text-sub">振替</button>
+    </div>
+    <div>
+      <label class="text-xs text-sub">金額</label>
+      <input type="text" inputmode="numeric" placeholder="¥0" class="w-full text-3xl font-bold tabular py-2 border-b-2 focus:border-ink outline-none" />
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2">
+        <label class="text-xs text-sub">カテゴリ（葉のみ入力）</label>
+        <select class="w-full mt-1 border rounded-lg px-3 py-2 text-sm">
+          <optgroup label="変動費 › 食費（1人）">
+            <option>朝飯</option><option>昼飯</option><option>晩飯</option>
+          </optgroup>
+          <optgroup label="変動費 › 食費">
+            <option>交際費</option><option>プレゼント・奢り</option><option>スーパー・まとめ買い</option>
+          </optgroup>
+          <optgroup label="変動費 › 自己投資・1人体験">
+            <option>1人体験</option><option>結婚式</option>
+          </optgroup>
+          <optgroup label="変動費 › 諸経費・備品購入費">
+            <option>旅費・交通費</option><option>物品購入費</option><option>その他諸経費</option><option>嗜好品(TBC)</option>
+          </optgroup>
+          <optgroup label="変動費">
+            <option>支払い利息</option>
+          </optgroup>
+          <optgroup label="収入">
+            <option>給与収入(手取り)</option><option>副業・その他収益</option><option>家族収入</option>
+            <option>ポイント収入</option><option>投資収益(配当)</option>
+          </optgroup>
+          <optgroup label="PL対象外">
+            <option>経費立替</option><option>経費精算</option><option>借入金</option><option>元金返済</option>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-sub">決済手段</label>
+        <select class="w-full mt-1 border rounded-lg px-3 py-2 text-sm">
+          <optgroup label="クレジットカード">
+            <option>EPOSカード</option><option>PayPayカード</option><option>Oliveカード</option>
+          </optgroup>
+          <optgroup label="銀行口座">
+            <option>みずほ銀行</option><option>三井住友銀行</option><option>三菱UFJ銀行</option><option>楽天銀行</option>
+          </optgroup>
+          <optgroup label="プリペイド">
+            <option>PayPay残高</option><option>ANA Pay</option><option>JAL Pay</option>
+            <option>PASMO</option><option>ICOCA</option><option>VポイントPay</option><option>メルペイ</option>
+          </optgroup>
+          <optgroup label="ポイント">
+            <option>Pontaポイント</option><option>dポイント</option><option>PayPayポイント(自動運用)</option>
+          </optgroup>
+          <option>現金</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-sub">発生日</label>
+        <input type="date" value="2026-05-31" class="w-full mt-1 border rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div class="col-span-2">
+        <label class="text-xs text-sub">メモ</label>
+        <input type="text" placeholder="任意" class="w-full mt-1 border rounded-lg px-3 py-2 text-sm" />
+      </div>
+    </div>
+    <details class="text-sm border rounded-lg px-3 py-2">
+      <summary class="text-sub cursor-pointer text-xs">分割支払い（カード＋ポイント併用など）</summary>
+      <div class="mt-2 text-xs text-sub bg-slate-50 rounded p-2">
+        例: EPOSカード ¥8,000 ＋ Pontaポイント ¥2,000 = 合計 ¥10,000<br/>
+        <span class="text-[10px]">※ 実装時は支払い脚を追加できるUIになります（ADR-025）</span>
+      </div>
+    </details>
+    <label class="flex items-center gap-2 text-sm text-sub"><input type="checkbox" checked /> 確定（予実フラグ）</label>
+    <button onclick="closeModal()" class="w-full bg-ink text-white font-semibold py-3 rounded-xl">保存する</button>
+    <p class="text-[11px] text-sub text-center">※ モックアップのため保存はされません</p>
+  </div>
+</div>
+
+<script>
+const yen = n => '¥' + n.toLocaleString('ja-JP');
+
+// ---- 固定費（seed.sql の実値）----
+const fixedCosts = [
+  { name: '家賃',               amount: 129987, wallet: 'みずほ銀行' },
+  { name: 'ジム',               amount: 8000,   wallet: 'PayPayカード' },
+  { name: '生命保険',           amount: 9307,   wallet: 'EPOSカード' },
+  { name: '携帯+YouTube',       amount: 9200,   wallet: 'PayPayカード' },
+  { name: '定期券代',           amount: 13030,  wallet: 'PayPay→PASMO' },
+  { name: 'iCloud拡張',         amount: 150,    wallet: 'EPOSカード' },
+  { name: 'BASE FOOD/ナッシュ', amount: 4036,   wallet: 'PayPayカード' },
+  { name: 'Kindle',             amount: 980,    wallet: 'EPOSカード' },
+];
+
+// ---- 変動費 ----
+const varTree = [
+  { group: '食費', items: [
+    { name: '食費(1人)〔朝+昼+晩〕', amount: 33500, agg: true },
+    { name: '交際費',               amount: 28000 },
+    { name: 'プレゼント・奢り',     amount: 5000 },
+    { name: 'スーパー・まとめ買い', amount: 22000 },
+  ]},
+  { group: '自己投資・1人体験', items: [
+    { name: '1人体験', amount: 9000 },
+    { name: '結婚式',  amount: 0 },
+  ]},
+  { group: '諸経費・備品購入費', items: [
+    { name: '旅費・交通費',   amount: 8500 },
+    { name: '物品購入費',     amount: 14000 },
+    { name: 'その他諸経費',   amount: 3000 },
+    { name: '嗜好品(TBC)',    amount: 6000 },
+  ]},
+];
+
+// ---- ウォレット ----
+const banks = [
+  { name: 'みずほ銀行',   role: '給与振込・家賃引落',        value: 680000 },
+  { name: '三井住友銀行', role: 'カード引落口座',             value: 320000 },
+  { name: '楽天銀行',     role: '楽天証券連携',              value: 240000 },
+  { name: '三菱UFJ銀行',  role: '分散用',                   value: 50000 },
+];
+const prepaids = [
+  { name: 'PayPay残高', value: 8500 },
+  { name: 'ANA Pay',    value: 24000 },
+  { name: 'JAL Pay',    value: 0 },
+  { name: 'PASMO',      value: 3200 },
+  { name: 'ICOCA',      value: 1800 },
+  { name: 'VポイントPay', value: 500 },
+  { name: 'メルペイ',   value: 0 },
+];
+const pointWallets = [
+  { name: 'Pontaポイント',           value: 2300 },
+  { name: 'dポイント',               value: 1700 },
+  { name: 'PayPayポイント\n(自動運用)', value: 4200 },
+];
+const cards = [
+  { name: 'EPOSカード',   brand: 'VISA',       value: 64200, schedule: '7/27 引落' },
+  { name: 'PayPayカード', brand: 'Mastercard', value: 68900, schedule: '6/27 引落' },
+  { name: 'Oliveカード',  brand: 'VISA',       value: 21300, schedule: '6/26 引落' },
+];
+
+// ---- 予実データ ----
+const budgetIncome  = 420000;
+const budgetExpense = 303690; // 固定費174690 + 変動費129000
+const closed = [true, true, false, false, false, false, false, false, false, false, false, false];
+const actualIncome  = [430000, 473000, ...Array(10).fill(budgetIncome)];
+const actualExpense = [298000, 303690, ...Array(10).fill(budgetExpense)];
+
+const yojitsuRows = [
+  { label: '収入',     color: 'text-income',              data: actualIncome  },
+  { label: '支出',     color: 'text-variable',            data: actualExpense },
+  { label: '月次黒字', color: 'text-profit font-semibold', data: actualIncome.map((v,i)=>v-actualExpense[i]) },
+];
+const budgets = [budgetIncome, budgetExpense, budgetIncome - budgetExpense];
+
+document.getElementById('yojitsu-body').innerHTML = yojitsuRows.map((row, ri) => {
+  const total = row.data.reduce((s,v)=>s+v, 0);
+  const cells = row.data.map((v, i) => {
+    const diff = v - budgets[ri];
+    const diffHtml = closed[i]
+      ? `<div class="text-[10px] ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}">${diff >= 0 ? '+' : ''}${(diff/1000).toFixed(0)}k</div>`
+      : '';
+    return closed[i]
+      ? `<td class="px-2 py-3 text-right bg-slate-800 text-white"><div class="font-semibold">${(v/10000).toFixed(1)}万</div>${diffHtml}</td>`
+      : `<td class="px-2 py-3 text-right text-slate-400"><div>${(v/10000).toFixed(1)}万</div></td>`;
+  }).join('');
+  return `<tr class="hover:bg-slate-50 border-b">
+    <td class="px-4 py-3 font-medium text-sm ${row.color} whitespace-nowrap">${row.label}</td>
+    ${cells}
+    <td class="px-4 py-3 text-right font-semibold">${(total/10000).toFixed(1)}万
+      <div class="text-[10px] text-sub">予算 ${(budgets[ri]*12/10000).toFixed(1)}万</div>
+    </td>
+  </tr>`;
+}).join('');
+
+document.getElementById('yojitsu-detail').innerHTML = [
+  { label: '収入',     actual: 473000, budget: budgetIncome },
+  { label: '固定費',   actual: 174690, budget: 174690 },
+  { label: '変動費',   actual: 129000, budget: 129000 },
+  { label: '月次黒字', actual: 169310, budget: budgetIncome - budgetExpense },
+].map(d => {
+  const diff = d.actual - d.budget;
+  const pct = Math.round(d.actual / d.budget * 100);
+  return `<div class="flex items-center gap-3 text-sm">
+    <div class="w-20 text-sub text-xs shrink-0">${d.label}</div>
+    <div class="flex-1">
+      <div class="flex justify-between mb-1">
+        <span class="tabular font-semibold">${yen(d.actual)}</span>
+        <span class="tabular text-xs text-sub">予算 ${yen(d.budget)} ・ ${pct}% ・
+          <span class="${diff >= 0 ? 'text-profit' : 'text-red-500'}">${diff >= 0 ? '+' : ''}${yen(diff)}</span></span>
+      </div>
+      <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div class="h-full ${pct > 100 ? 'bg-red-400' : 'bg-profit'}" style="width:${Math.min(pct,100)}%"></div>
+      </div>
+    </div>
+  </div>`;
+}).join('');
+
+// ---- 固定費レンダリング ----
+const fixedTotal = fixedCosts.reduce((s,f)=>s+f.amount, 0);
+document.getElementById('fixed').innerHTML =
+  fixedCosts.map(f => `
+    <div class="flex justify-between">
+      <span>${f.name}<span class="text-[10px] ml-1 text-sub">${f.wallet}</span></span>
+      <span class="tabular">${yen(f.amount)}</span>
+    </div>`).join('') +
+  `<div class="border-t mt-2 pt-2 flex justify-between font-semibold text-fixed">
+    <span>合計</span><span class="tabular">${yen(fixedTotal)}</span>
+  </div>`;
+
+document.getElementById('varTree').innerHTML = varTree.map(g => {
+  const sum = g.items.reduce((s,i)=>s+i.amount, 0);
+  return `<div>
+    <div class="flex justify-between text-sm font-semibold mb-1.5">
+      <span>${g.group}</span><span class="tabular text-variable">${yen(sum)}</span>
+    </div>
+    <div class="space-y-1 pl-3">
+      ${g.items.map(i=>`
+        <div class="flex justify-between text-sm ${i.agg?'text-sub italic':''}">
+          <span>${i.agg?'↳ ':''}${i.name}${i.agg?' (集計)':''}</span>
+          <span class="tabular">${yen(i.amount)}</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}).join('');
+
+document.getElementById('bank-cards').innerHTML = banks.map(w => `
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <div class="text-xs text-sub">${w.role}</div>
+    <div class="font-semibold mt-0.5">${w.name}</div>
+    <div class="text-2xl font-bold tabular mt-2">${yen(w.value)}</div>
+  </div>`).join('');
+
+document.getElementById('prepaid-cards').innerHTML = prepaids.map(w => `
+  <div class="bg-white rounded-xl shadow-sm p-3">
+    <div class="text-xs font-semibold">${w.name}</div>
+    <div class="text-lg font-bold tabular mt-1">${yen(w.value)}</div>
+  </div>`).join('');
+
+document.getElementById('points-cards').innerHTML = pointWallets.map(w => `
+  <div class="bg-white rounded-xl shadow-sm p-3">
+    <div class="text-xs font-semibold">${w.name.replace('\n','<br/>')}</div>
+    <div class="text-lg font-bold tabular mt-1 text-amber-600">${w.value.toLocaleString()}pt</div>
+  </div>`).join('');
+
+document.getElementById('card-cards').innerHTML = cards.map(c => `
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <div class="text-xs text-sub">${c.brand} ・ 未払い</div>
+    <div class="font-semibold">${c.name}</div>
+    <div class="text-2xl font-bold tabular mt-2 text-red-500">−${yen(c.value)}</div>
+    <div class="text-xs text-sub mt-1">${c.schedule}</div>
+  </div>`).join('');
+
+document.getElementById('card-schedule').innerHTML = [
+  { name: 'Oliveカード',  date: '6/26', amount: 21300 },
+  { name: 'PayPayカード', date: '6/27', amount: 68900 },
+  { name: 'EPOSカード',   date: '7/27', amount: 64200 },
+].map(c => `
+  <div class="flex items-center justify-between text-sm border rounded-xl px-4 py-3">
+    <div>
+      <div class="font-semibold">${c.name}</div>
+      <div class="text-xs text-sub">三井住友銀行 から引き落とし</div>
+    </div>
+    <div class="text-right">
+      <div class="tabular font-semibold">${yen(c.amount)}</div>
+      <div class="text-xs text-sub">${c.date}</div>
+    </div>
+  </div>`).join('');
+
+document.getElementById('tx-rows').innerHTML = [
+  { d: '05/30', c: '昼飯',                 w: 'PayPay残高',   m: '社食',         a: -680,   excl: false },
+  { d: '05/30', c: '経費精算',             w: '三井住友銀行', m: '出張交通費',   a: 12000,  excl: true  },
+  { d: '05/29', c: '交際費',               w: 'EPOSカード',   m: '同僚と飲み',   a: -8500,  excl: false },
+  { d: '05/28', c: '旅費・交通費',         w: 'Oliveカード',  m: '新幹線',       a: -13800, excl: false },
+  { d: '05/27', c: 'スーパー・まとめ買い', w: 'PayPayカード', m: 'Amazon日用品', a: -4120,  excl: false },
+  { d: '05/26', c: '晩飯',                 w: 'PayPay残高',   m: '一人飯',       a: -980,   excl: false },
+  { d: '05/25', c: '給与収入(手取り)',      w: 'みずほ銀行',   m: '5月給与',      a: 420000, excl: false },
+  { d: '05/24', c: '嗜好品(TBC)',          w: 'EPOSカード',   m: '',            a: -3000,  excl: false },
+].map(t => `
+  <tr class="hover:bg-slate-50 ${t.excl?'text-excl':''}">
+    <td class="px-3 py-2 tabular ${t.excl?'':'text-sub'}">${t.d}</td>
+    <td class="px-3 py-2">${t.c}${t.excl?' <span class="text-[10px] border border-excl rounded px-1">PL対象外</span>':''}</td>
+    <td class="px-3 py-2 hidden sm:table-cell ${t.excl?'':'text-sub'}">${t.w}</td>
+    <td class="px-3 py-2 hidden md:table-cell ${t.excl?'':'text-sub'}">${t.m}</td>
+    <td class="px-3 py-2 text-right tabular font-semibold ${t.a>0&&!t.excl?'text-income':''}">${t.a>0?'+':''}${yen(Math.abs(t.a))}</td>
+  </tr>`).join('');
+
+const allTabs = ['dashboard','yojitsu','wallets','transactions'];
+function showTab(name) {
+  allTabs.forEach(n => {
+    document.getElementById('view-'+n).classList.toggle('hidden', n!==name);
+    const t = document.getElementById('tab-'+n);
+    t.classList.toggle('border-ink', n===name);
+    t.classList.toggle('font-semibold', n===name);
+    t.classList.toggle('border-transparent', n!==name);
+    t.classList.toggle('text-sub', n!==name);
+  });
+}
+function openModal()  { document.getElementById('modal').classList.remove('hidden'); }
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+function setType(type) {
+  ['expense','income','transfer'].forEach(t => {
+    document.getElementById('btn-'+t).className = t === type
+      ? 'flex-1 py-2 rounded-lg bg-ink text-white font-semibold'
+      : 'flex-1 py-2 rounded-lg bg-slate-100 text-sub';
+  });
+}
+</script>
+</body>
+</html>

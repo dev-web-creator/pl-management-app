@@ -204,6 +204,12 @@
 - **影響範囲**: 残高スナップショット集計、資産予実(targets)、配当(income)、資産ダッシュボード、wallets、balance_snapshots（任意のリコンサイル）。
 - **状態**: 有効（全確定）
 
+## ADR-028 | 2026-06-06 | AWS構成は App Runner + RDS(PostgreSQL) + ECR/Secrets Manager
+- **決定**: 本番は Next.js を `output:'standalone'` でコンテナ化し ECR→App Runner で稼働、DBは RDS for PostgreSQL（プライベート・TLS）。接続情報は Secrets Manager。手順は `docs/aws-deployment.md`。
+- **理由**: ローカルと同じPostgreSQLで `schema.sql/seed.sql` を流用でき（ADR-005）、App RunnerはECS比で学習・運用が軽い。
+- **影響範囲**: `Dockerfile`/`.dockerignore`/`next.config.ts`(standalone)、デプロイ手順、コスト（概算$20〜45/月）。
+- **状態**: 有効（設計・成果物は準備完了。実プロビジョニングはユーザーのAWSアカウント・課金同意待ち＝実行ゲート）。
+
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
 

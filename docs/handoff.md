@@ -14,52 +14,47 @@ PL（手取り→固定費→変動費→月次黒字）と資産（総資産・
 3. `docs/master-data.md` … カテゴリ/口座/カード/控除/給与のマスタ
 4. `docs/database-design.md` … ER設計＋全カラム定義＋検証トレース
 5. `docs/development-process.md` … フェーズ管理表（現在地）
+6. `docs/how-it-works.md` … （学習用）コード5層の解剖。1取引が画面→DB→画面と巡る流れの解説
 
 ## 進捗（フェーズ）
 - Phase 0 要件たたき台：✅
 - Phase 1 UI/UXモック（`mockup/index.html`）：✅
 - Phase 2 現運用すり合わせ（ADR-001〜027）：✅
 - Phase 3 基本設計（ER＋カラム定義 `db/schema.sql`）：✅（画面遷移/API一覧は未）
-- Phase 4 実装：🚧 **DBをローカルで動かす作業の途中**
+- Phase 4 実装：🚧 **DB稼働＋Next.js接続済み。トップで実データのPLダッシュボード表示確認（2026-06-06）**
 
 ## いま何をしているか（再開ポイント）
-**ローカルPostgreSQLを立ち上げて `db/schema.sql`＋`db/seed.sql` を流す作業の途中。**
+**✅ ローカルPostgreSQL起動 → `schema.sql`＋`seed.sql` 投入 → Next.js接続まで完了（2026-06-06 検証済み）。**
 
-経緯と注意：
-- ユーザーのWindowsユーザー名が日本語（`C:\Users\吉岡リクルゴス`）。
-- このため **EDBのGUIインストーラが `getlocales.ps1` で "Illegal characters in path" エラーになり使えない**。
-  TEMPをC:\Tempに変えても、管理者昇格時に戻されてダメだった。
-- → **GUIインストーラは断念。ポータブル版（ZIPバイナリ）で構築する方針に切替済み。**
-- ポータブルZIPの一部DLが途中で壊れた（267MBで中断）。**再ダウンロードから再開**する。
+Next.js接続の状態：
+- `lib/db.ts`（pg Pool）＋ `lib/queries.ts`（PL/残高/総資産/変動費ロールアップの集計関数）。
+- `app/page.tsx` がサーバーコンポーネントでDBから集計し、`http://localhost:3000` に実データのダッシュボードを描画。`/api/health` でDB件数も確認可。
+- 体感用デモ取引: `db/dev/demo_seed.sql`（memo LIKE 'DEMO%' で削除可）。集計クエリ集: `db/dev/queries.sql`（lib/queries.ts と同内容）。※`db/dev/` は docker-compose の自動実行対象外（schema/seedの順序を壊さないため）。
+- 起動: プロジェクト直下で `npm run dev`（要 DBサーバ起動済み）。
+- 学習用の `/inspect`（`app/inspect/page.tsx`）= 全テーブルの中身を閲覧するDBインスペクター（読み取り専用）。入力前後で行が増える様子を確認できる。※友人共有前にアクセス制限を検討（現状は誰でも閲覧可）。
 
-## 再開手順（ポータブルPostgreSQL）
-すべてASCIIパス（`C:\Temp`, `C:\pgsql`）で行う（日本語パス回避）。
+検証結果（成功判定をすべて満たす）：
+- テーブル 13個 / wallets 18（bank4・credit_card3・prepaid7・points3・cash1）
+- categories 49（変動費17・固定費11・収入6・控除10・対象外5）/ recurring_rules 10 / users 1
 
+環境（確定・日本語パス問題は解消済み）：
+- ポータブルPostgreSQL **17.5** を `C:\pgsql`（ASCIIパス）に展開・初期化済み（trust認証）。
+- データ領域 `C:\pgsql\data` 初期化済み。DB名 `pl_app`。
+- GUIインストーラ（EDB）は日本語ユーザー名で失敗するため不使用。ポータブル版で確定。
+
+## DBの起動／再投入手順（次セッション用）
 ```powershell
-# 1) バイナリZIPをDL（完全に落ちるまで。壊れたら再実行）
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest 'https://get.enterprisedb.com/postgresql/postgresql-18.4-1-windows-x64-binaries.zip' -OutFile 'C:\Temp\pg-binaries.zip' -UseBasicParsing
-# 検証：壊れていないか（OpenReadが成功すればOK）
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::OpenRead('C:\Temp\pg-binaries.zip').Entries.Count
-
-# 2) 展開（C:\ に展開すると C:\pgsql\bin ... ができる）
-Expand-Archive 'C:\Temp\pg-binaries.zip' -DestinationPath 'C:\' -Force
-
-# 3) DB初期化（trust認証＝ローカルはパスワード不要 / UTF8）
-C:\pgsql\bin\initdb.exe -D C:\pgsql\data -U postgres -A trust -E UTF8 --locale=C
-
-# 4) サーバ起動（ポート5432）
+# サーバ起動（停止していたら）
 C:\pgsql\bin\pg_ctl.exe -D C:\pgsql\data -l C:\pgsql\log.txt start
+# 接続確認
+(Test-NetConnection localhost -Port 5432).TcpTestSucceeded   # → True
 
-# 5) schema＋seed 投入（用意済みスクリプト。psqlはC:\pgsql\binも自動探索する）
-.\db\run.ps1     # パスワードは空Enterでよい（trust認証）
-#   もしくは手動:
-#   C:\pgsql\bin\psql.exe -U postgres -h localhost -c "CREATE DATABASE pl_app;"
-#   $env:PGCLIENTENCODING='UTF8'
-#   C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -f db\schema.sql
-#   C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -f db\seed.sql
-#   C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -c "\dt"
+# schema/seed を入れ直す場合（trust認証＝パスワード不要。run.ps1はRead-Hostで対話待ちするので手動推奨）
+$env:PGCLIENTENCODING='UTF8'
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -v ON_ERROR_STOP=1 -f db\schema.sql
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -v ON_ERROR_STOP=1 -f db\seed.sql
+# 確認
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -c "\dt"
 ```
 **成功判定**: テーブル13個、wallets≈18 / categories≈40 / recurring_rules=10 件。
 

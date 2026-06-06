@@ -8,11 +8,11 @@
 | Phase | 名称 | 目的 | 成果物 | 状態 |
 |-------|------|------|--------|------|
 | 0 | 要件のたたき台 | コンセプト・要件の言語化 | `docs/requirements.md` | ✅ 完了 |
-| 1 | **UI/UXモックアップ** | 画面と操作感の確認（捨てやすいHTML） | `mockup/index.html` | 🚧 進行中 |
-| 2 | 現運用のすり合わせ | ユーザーの実運用詳細を反映し要件更新 | requirements.md 更新 / `docs/master-data.md` / ADR-001〜026 | ✅ 完了 |
+| 1 | **UI/UXモックアップ** | 画面と操作感の確認（捨てやすいHTML） | `mockup/index.html` | ✅ 完了 |
+| 2 | 現運用のすり合わせ | ユーザーの実運用詳細を反映し要件更新 | requirements.md 更新 / `docs/master-data.md` / ADR-001〜027 | ✅ 完了 |
 | 3 | 基本設計 | 確定したER図・画面遷移・API一覧 | `docs/database-design.md` 他 | 🚧 ER完了。画面遷移/API一覧が残 |
-| 4 | 実装（DB→API→UI） | ローカルPostgreSQL + Next.js | アプリ本体 | 🚧 DDL/seed作成（`db/`）。検証待ち |
-| 5 | AWS移行・本番化 | RDS等へのデプロイ | インフラ定義 | ⬜ 未着手 |
+| 4 | 実装（DB→API→UI） | ローカルPostgreSQL + Next.js | アプリ本体 | 🚧 DB稼働＋Next.js接続✅・実データ表示。次は入力UI／予実 |
+| 5 | AWS移行・本番化 | RDS等へのデプロイ | `Dockerfile` / `docs/aws-deployment.md` | 🚧 成果物準備完了。実構築はAWSアカウント・課金同意待ち |
 
 > 詳細設計（クラス設計レベル）は Phase 3 の基本設計に内包し、独立フェーズにはしない方針。
 
@@ -29,6 +29,11 @@
 ## 現在地
 
 - Phase 0〜3 完了（要件・現運用すり合わせ・基本設計＝ER＋カラム定義）。ADRは001〜027。
-- Phase 4 実装の途中：**ローカルPostgreSQLを立ち上げて schema/seed を流す作業中**。
-  - 日本語ユーザー名でGUIインストーラが不可 → ポータブルZIPで構築する方針に切替。
-- セッション移行する場合は **`docs/handoff.md`** に再開手順あり（CLI版Claude Code等）。
+- Phase 4 実装：**ローカルPostgreSQL（C:\pgsql / 17.5）起動済み、`pl_app` に schema/seed 投入完了**（2026-06-06 検証：テーブル13・wallets18・categories49・recurring_rules10）。日本語パス問題はポータブル版で解消済み。
+- Next.js 接続済み：`lib/queries.ts`＋`app/page.tsx`（サーバーコンポーネント）で `http://localhost:3000` に実データのPLダッシュボードを表示。集計はすべてSQL（残高カラム無し）。
+- **次の一手**：
+  1. 取引入力UI（フォーム→ transactions/legs にINSERT）。まず「支出を1件足すと画面が更新される」を実装。
+  2. 予実ビュー（targets×実績、monthly_closings の黒塗り）。
+  3. `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値に差し替え。
+  4. Phase 3 残り：画面遷移・API一覧の基本設計。
+- セッション移行する場合は **`docs/handoff.md`** に起動・再投入手順あり。

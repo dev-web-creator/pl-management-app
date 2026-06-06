@@ -1,0 +1,104 @@
+import Link from "next/link";
+import { listTables, getTableDump } from "@/lib/queries";
+
+export const dynamic = "force-dynamic"; // 毎回DBの最新を見る
+
+// 読みやすい順（マスタ→取引→その他）
+const PREFERRED = [
+  "users",
+  "wallets",
+  "categories",
+  "transactions",
+  "transaction_legs",
+  "transfers",
+  "recurring_rules",
+  "card_statements",
+  "targets",
+  "monthly_closings",
+  "payslips",
+  "payslip_items",
+  "balance_snapshots",
+];
+
+function fmt(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (v instanceof Date) {
+    const p = (n: number) => String(n).padStart(2, "0");
+    const ymd = `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+    const hasTime = v.getHours() || v.getMinutes() || v.getSeconds();
+    return hasTime ? `${ymd} ${p(v.getHours())}:${p(v.getMinutes())}` : ymd;
+  }
+  return String(v);
+}
+
+export default async function Inspect() {
+  const tables = await listTables();
+  const ordered = [
+    ...PREFERRED.filter((t) => tables.includes(t)),
+    ...tables.filter((t) => !PREFERRED.includes(t)),
+  ];
+  const dumps = await Promise.all(
+    ordered.map((t) => getTableDump(t).then((d) => ({ name: t, ...d })))
+  );
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
+      <div className="max-w-6xl mx-auto space-y-5">
+        <header className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">🔍 DBインスペクター（pl_app の中身）</h1>
+          <Link href="/" className="text-sm text-sky-600 hover:underline">
+            ← ダッシュボードへ
+          </Link>
+        </header>
+        <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          読み取り専用・各テーブル先頭200件まで。
+          ダッシュボードの「＋ 取引を入力」で1件足してから、このページを再読み込みすると、
+          <b> transactions と transaction_legs に新しい行が増える</b>のが見えます（＝裏側で起きていること）。
+        </p>
+
+        {dumps.map((d) => (
+          <section key={d.name} className="bg-white rounded-xl shadow-sm p-4 overflow-x-auto">
+            <h2 className="font-bold mb-2">
+              {d.name}{" "}
+              <span className="text-xs font-normal text-slate-400">
+                ({d.total}件{d.total > d.shown ? ` 中 先頭${d.shown}件` : ""})
+              </span>
+            </h2>
+            {d.rows.length === 0 ? (
+              <p className="text-sm text-slate-400">（空）</p>
+            ) : (
+              <table className="text-xs border-collapse">
+                <thead>
+                  <tr>
+                    {d.columns.map((c) => (
+                      <th
+                        key={c}
+                        className="border border-slate-200 px-2 py-1 bg-slate-50 text-left whitespace-nowrap"
+                      >
+                        {c}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.rows.map((row, i) => (
+                    <tr key={i} className="even:bg-slate-50/50">
+                      {d.columns.map((c) => (
+                        <td
+                          key={c}
+                          className="border border-slate-200 px-2 py-1 whitespace-nowrap tabular-nums"
+                        >
+                          {fmt(row[c])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        ))}
+      </div>
+    </main>
+  );
+}

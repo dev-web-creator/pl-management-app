@@ -150,13 +150,17 @@ export async function getTableDump(table: string): Promise<TableDump> {
 
 export type CategoryTotal = { id: number; name: string; total: number };
 
-// 変動費グループ（ルート）ごとの配下合計（再帰ロールアップ）
-export async function getVariableGroups(): Promise<CategoryTotal[]> {
+// 変動費グループ（ルート）ごとの配下合計（再帰ロールアップ）。指定月のみ集計。
+export async function getVariableGroups(period = "2026-06-01"): Promise<CategoryTotal[]> {
   const { rows } = await pool.query(
     `WITH RECURSIVE
        leaf AS (
          SELECT category_id, SUM(amount) AS amt
-         FROM transactions WHERE user_id=$1 AND type='expense' GROUP BY category_id
+         FROM transactions
+         WHERE user_id=$1 AND type='expense'
+           AND accrual_date >= $2::date
+           AND accrual_date <  ($2::date + interval '1 month')
+         GROUP BY category_id
        ),
        subtree AS (
          SELECT id AS root_id, id AS node_id FROM categories WHERE user_id=$1
@@ -170,7 +174,51 @@ export async function getVariableGroups(): Promise<CategoryTotal[]> {
      WHERE c.user_id=$1 AND c.pl_type='variable_cost' AND c.parent_id IS NULL
      GROUP BY c.id, c.name
      ORDER BY c.display_order, c.id`,
-    [USER_ID]
+    [USER_ID, period]
+  );
+  return rows;
+}
+
+export type FixedCostItem = {
+  id: number;
+  name: string;
+  plan: number; // 予定額（マスタ recurring_rules）
+  actual: number | null; // 実額（当月の取引。無ければ null）
+  effective: number; // COALESCE(実額, 予定額)＝PL計上に使う額
+  is_actual: boolean; // 実額が入っているか（予定/実績バッジ用）
+  wallet_name: string | null; // 引落先ウォレット名
+};
+
+// 固定費の予実突合（ADR-030）。指定月にアクティブな固定費マスタを「予定額」とし、
+// 当月の fixed_cost 取引（category_id で突合）を「実額」として並べる。予定は取引化しない。
+export async function getFixedCostPlanVsActual(
+  period = "2026-06-01"
+): Promise<FixedCostItem[]> {
+  const { rows } = await pool.query(
+    `WITH active_rules AS (
+       SELECT r.id, r.name, r.category_id, r.amount AS plan, w.name AS wallet_name
+       FROM recurring_rules r
+       LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
+       WHERE r.user_id = $1 AND r.is_active
+         AND r.start_month <= $2::date
+         AND (r.end_month IS NULL OR r.end_month > $2::date)
+     ),
+     actual AS (
+       SELECT category_id, SUM(amount)::int AS act
+       FROM transactions
+       WHERE user_id = $1 AND type='expense'
+         AND accrual_date >= $2::date
+         AND accrual_date <  ($2::date + interval '1 month')
+       GROUP BY category_id
+     )
+     SELECT ar.id, ar.name, ar.plan, ar.wallet_name,
+            a.act                       AS actual,
+            COALESCE(a.act, ar.plan)::int AS effective,
+            (a.act IS NOT NULL)         AS is_actual
+     FROM active_rules ar
+     LEFT JOIN actual a ON a.category_id = ar.category_id
+     ORDER BY ar.plan DESC, ar.id`,
+    [USER_ID, period]
   );
   return rows;
 }

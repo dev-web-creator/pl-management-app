@@ -11,8 +11,8 @@
 | 1 | **UI/UXモックアップ** | 画面と操作感の確認（捨てやすいHTML） | `mockup/index.html` | ✅ 完了 |
 | 2 | 現運用のすり合わせ | ユーザーの実運用詳細を反映し要件更新 | requirements.md 更新 / `docs/master-data.md` / ADR-001〜027 | ✅ 完了 |
 | 3 | 基本設計 | 確定したER図・画面遷移・API一覧 | `docs/database-design.md` 他 | 🚧 ER完了。画面遷移/API一覧が残 |
-| 4 | 実装（DB→API→UI） | ローカルPostgreSQL + Next.js | アプリ本体 | 🚧 DB稼働＋Next.js接続✅・実データ表示。次は入力UI／予実 |
-| 5 | AWS移行・本番化 | RDS等へのデプロイ | `Dockerfile` / `docs/aws-deployment.md` | 🚧 成果物準備完了。実構築はAWSアカウント・課金同意待ち |
+| 4 | 実装（DB→API→UI） | ローカルPostgreSQL + Next.js | アプリ本体 | 🚧 DB稼働＋Next.js接続✅・入力UI✅。固定費の予実（ADR-030）実装中 |
+| 5 | AWS移行・本番化 | RDS等へのデプロイ | `Dockerfile` / `docs/aws-deployment.md` | ✅ **Vercel + Neon に本番デプロイ済み（稼働中）**。AWS版は成果物準備済・課金同意待ち |
 
 > 詳細設計（クラス設計レベル）は Phase 3 の基本設計に内包し、独立フェーズにはしない方針。
 
@@ -31,9 +31,11 @@
 - Phase 0〜3 完了（要件・現運用すり合わせ・基本設計＝ER＋カラム定義）。ADRは001〜027。
 - Phase 4 実装：**ローカルPostgreSQL（C:\pgsql / 17.5）起動済み、`pl_app` に schema/seed 投入完了**（2026-06-06 検証：テーブル13・wallets18・categories49・recurring_rules10）。日本語パス問題はポータブル版で解消済み。
 - Next.js 接続済み：`lib/queries.ts`＋`app/page.tsx`（サーバーコンポーネント）で `http://localhost:3000` に実データのPLダッシュボードを表示。集計はすべてSQL（残高カラム無し）。
-- **次の一手**：
-  1. 取引入力UI（フォーム→ transactions/legs にINSERT）。まず「支出を1件足すと画面が更新される」を実装。
-  2. 予実ビュー（targets×実績、monthly_closings の黒塗り）。
-  3. `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値に差し替え。
-  4. Phase 3 残り：画面遷移・API一覧の基本設計。
+- **本番**: Vercel + Neon にデプロイ済み（https://pl-management-app.vercel.app/ で稼働中）。ローカルPostgreSQL(C:\pgsql)は「ローカル開発時だけ」起動すればよく、本番(Neon)には無関係。
+- **次の一手**（2026-06-20 着手）：
+  1. ✅ 取引入力UI（支出/収入の単一脚）。
+  2. 🚧 **致命的修正**：サイト全体をBasic認証で保護（ADR-029。/inspect は残す）＋ 対象月のハードコード解消（動的な「今月」＋月送り）。
+  3. 🚧 **固定費の予実**（ADR-030）：recurring_rules を予定額として月次に自動表示し、実績と突合。
+  4. `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値に差し替え。
+  5. Phase 3 残り：画面遷移・API一覧の基本設計。
 - セッション移行する場合は **`docs/handoff.md`** に起動・再投入手順あり。

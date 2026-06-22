@@ -94,9 +94,14 @@ export default async function Home({
               ›
             </Link>
           </div>
-          <Link href="/inspect" className="text-xs text-sky-600 hover:underline">
-            🔍 DBの中身を見る
-          </Link>
+          <div className="flex items-center gap-3 text-xs">
+            <Link href={`/transactions?m=${period}`} className="text-sky-600 hover:underline">
+              取引一覧
+            </Link>
+            <Link href="/inspect" className="text-sky-600 hover:underline">
+              🔍 DB
+            </Link>
+          </div>
         </header>
 
         {/* 入力フォーム */}

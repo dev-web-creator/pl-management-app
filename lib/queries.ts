@@ -222,3 +222,35 @@ export async function getFixedCostPlanVsActual(
   );
   return rows;
 }
+
+export type TxRow = {
+  id: number;
+  date: string; // 'YYYY-MM-DD'
+  category: string;
+  pl_type: string;
+  type: string; // 'expense' | 'income'
+  amount: number;
+  memo: string | null;
+  wallets: string | null; // 支払い脚のウォレット名（分割は ' + ' 連結）
+};
+
+// 指定月の取引一覧（カテゴリ名・決済ウォレット名つき）。発生日の新しい順。
+export async function getMonthTransactions(period = "2026-06-01"): Promise<TxRow[]> {
+  const { rows } = await pool.query(
+    `SELECT t.id,
+            to_char(t.accrual_date, 'YYYY-MM-DD') AS date,
+            c.name AS category, c.pl_type, t.type, t.amount, t.memo,
+            string_agg(w.name, ' + ' ORDER BY tl.id) AS wallets
+     FROM transactions t
+     JOIN categories c ON c.id = t.category_id
+     LEFT JOIN transaction_legs tl ON tl.transaction_id = t.id
+     LEFT JOIN wallets w ON w.id = tl.wallet_id
+     WHERE t.user_id = $1
+       AND t.accrual_date >= $2::date
+       AND t.accrual_date <  ($2::date + interval '1 month')
+     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.accrual_date
+     ORDER BY t.accrual_date DESC, t.id DESC`,
+    [USER_ID, period]
+  );
+  return rows;
+}

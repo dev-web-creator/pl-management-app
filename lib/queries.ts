@@ -339,3 +339,33 @@ export async function getFixedCostCategories(): Promise<InputCategory[]> {
   );
   return rows;
 }
+
+// ---- 資金移動（振替・チャージ・カード支払い等） ----
+export type TransferRow = {
+  id: number;
+  date: string; // 'YYYY-MM-DD'
+  kind: string; // transfer | charge | cash_withdrawal | card_settlement
+  amount: number;
+  fee: number;
+  memo: string | null;
+  from_name: string;
+  to_name: string;
+};
+
+// 指定月の資金移動一覧。
+export async function getMonthTransfers(period = "2026-06-01"): Promise<TransferRow[]> {
+  const { rows } = await pool.query(
+    `SELECT t.id, to_char(t.transfer_date, 'YYYY-MM-DD') AS date, t.kind,
+            t.amount, t.fee, t.memo,
+            wf.name AS from_name, wt.name AS to_name
+     FROM transfers t
+     JOIN wallets wf ON wf.id = t.from_wallet_id
+     JOIN wallets wt ON wt.id = t.to_wallet_id
+     WHERE t.user_id = $1
+       AND t.transfer_date >= $2::date
+       AND t.transfer_date <  ($2::date + interval '1 month')
+     ORDER BY t.transfer_date DESC, t.id DESC`,
+    [USER_ID, period]
+  );
+  return rows;
+}

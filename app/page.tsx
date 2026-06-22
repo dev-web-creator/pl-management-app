@@ -99,6 +99,9 @@ export default async function Home({
             <Link href={`/transactions?m=${period}`} className="text-sky-600 hover:underline">
               取引一覧
             </Link>
+            <Link href={`/transfers?m=${period}`} className="text-sky-600 hover:underline">
+              振替
+            </Link>
             <Link href="/inspect" className="text-sky-600 hover:underline">
               🔍 DB
             </Link>

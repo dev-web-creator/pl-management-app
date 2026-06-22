@@ -105,6 +105,9 @@ export default async function Home({
             <Link href="/payslips" className="text-sky-600 hover:underline">
               給与
             </Link>
+            <Link href={`/budget?m=${period}`} className="text-sky-600 hover:underline">
+              予実
+            </Link>
             <Link href="/inspect" className="text-sky-600 hover:underline">
               🔍 DB
             </Link>

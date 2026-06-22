@@ -148,6 +148,51 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- 予実管理（ADR-016/020） ----
+export type BudgetVsActual = {
+  target_income: number;
+  target_expense: number;
+  actual_income: number;
+  actual_expense: number;
+  closed: boolean; // 月の確定（黒塗り）
+};
+
+export async function getBudgetVsActual(period: string): Promise<BudgetVsActual> {
+  const t = await pool.query(`SELECT metric, amount FROM targets WHERE user_id=$1 AND period=$2`, [
+    USER_ID,
+    period,
+  ]);
+  const tg: Record<string, number> = {};
+  t.rows.forEach((r) => (tg[r.metric] = r.amount));
+
+  const a = await pool.query(
+    `WITH x AS (
+       SELECT t.type, c.pl_type, t.amount
+       FROM transactions t JOIN categories c ON c.id=t.category_id
+       WHERE t.user_id=$1 AND t.accrual_date>=$2::date AND t.accrual_date<($2::date + interval '1 month')
+     )
+     SELECT COALESCE(SUM(amount) FILTER (WHERE type='income'  AND pl_type='income'),0)::int AS inc,
+            COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type IN ('fixed_cost','variable_cost')),0)::int AS exp
+     FROM x`,
+    [USER_ID, period]
+  );
+
+  const c = await pool.query(
+    `SELECT COUNT(*) FILTER (WHERE is_closed)::int AS closed_n
+     FROM monthly_closings
+     WHERE user_id=$1 AND period=$2 AND section IN ('income','fixed_cost','variable_cost')`,
+    [USER_ID, period]
+  );
+
+  return {
+    target_income: tg["income"] ?? 0,
+    target_expense: tg["expense"] ?? 0,
+    actual_income: a.rows[0].inc,
+    actual_expense: a.rows[0].exp,
+    closed: c.rows[0].closed_n >= 3,
+  };
+}
+
 // ---- 資産ダッシュボード（ADR-027） ----
 export type AssetTrendPoint = { month: string; total_assets: number; net_assets: number };
 

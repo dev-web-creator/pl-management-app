@@ -31,7 +31,7 @@
 - ✅ 振替／チャージ／カード支払いのUI（`/transfers`・`POST /api/transfers`・`DELETE /api/transfers/[id]`・`AddTransferForm`）。残高に連動・PL非計上。※クレカ請求サイクル(card_statements)との厳密な消込は ADR-023 実装時に。
 - ⬜ クレカ請求サイクルの自動判定＋カードビュー（ADR-023）
 - ⬜ 分割払いの入力UI（schema対応済・フォーム未対応・ADR-025）
-- ⬜ 予実：収入/支出/収支の `targets` × 実績、月次確定（黒塗り `monthly_closings`）（ADR-016/020）
+- ✅ 予実（`/budget`）：収入/支出/収支の目標×実績・達成率・差異、月次確定（黒塗り `monthly_closings`）。`getBudgetVsActual`・`/api/targets`・`/api/closings`・`BudgetForm`・`ConfirmMonthButton`（ADR-016/018/020）。
 
 ### P3（発展）
 - ✅ 給与明細の入力（`/payslips`・`/payslips/[period]/edit`・`POST /api/payslips`[月ごとupsert]・`DELETE /api/payslips/[id]`・`PayslipForm`）。支給/控除を動的行で入力→総支給・控除合計・手取り・時給換算を自動計算。税/社保は控除で管理（支出非計上・ADR-022）。**OCRは後段**。

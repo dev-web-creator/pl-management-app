@@ -23,7 +23,7 @@
 ### P1（実データを入れる前に必要）
 - ✅ **/inspect の保護**（ルート単位ガード・本番は `INSPECT_KEY`＋`?key=` 必須／ローカルは開放／全体middlewareは不使用で500回避）。
 - ⬜ **サイト全体の認証**（ADR-029）：ダッシュボード等もまだ公開。Vercel Previewで検証した安定middlewareで。実データ投入前に。
-- ✅ **取引一覧ビュー**（`/transactions`・月切替・**削除**）：`app/transactions/page.tsx`＋`DELETE /api/transactions/[id]`＋`DeleteTxButton`。編集は次段。
+- ✅ **取引一覧ビュー**（`/transactions`・月切替・**削除**・**編集**）：一覧＋`DELETE`＋`PUT /api/transactions/[id]`＋`/transactions/[id]/edit`（フォーム流用）。分割払いは編集で単一脚に集約。
 - ✅ 固定費「実額で記録」ワンタップ（ADR-030次段）：`POST /api/recurring/post`＋`RecordFixedCostButton`。予定行から1タップで当月の実額取引化（重複ガードあり）。
 - ⬜ `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値へ
 

@@ -12,27 +12,40 @@ const PL_LABEL: Record<string, string> = {
   excluded: "PL対象外",
 };
 
+export type EditTarget = {
+  id: number;
+  type: "expense" | "income";
+  amount: number;
+  categoryId: number;
+  walletId: number;
+  date: string;
+  memo: string;
+  legCount: number;
+};
+
 export default function AddTransactionForm({
   categories,
   wallets,
   today,
+  edit,
 }: {
   categories: InputCategory[];
   wallets: WalletOption[];
   today: string;
+  edit?: EditTarget; // 指定時は「編集モード」（PUT）。未指定は「作成モード」（POST）
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [type, setType] = useState<"expense" | "income">("expense");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState<number>(categories[0]?.id ?? 0);
-  const [walletId, setWalletId] = useState<number>(wallets[0]?.id ?? 0);
-  const [date, setDate] = useState(today);
-  const [memo, setMemo] = useState("");
+  const isEdit = !!edit;
+  const [open, setOpen] = useState(isEdit); // 編集モードは最初から開く
+  const [type, setType] = useState<"expense" | "income">(edit?.type ?? "expense");
+  const [amount, setAmount] = useState(edit ? String(edit.amount) : "");
+  const [categoryId, setCategoryId] = useState<number>(edit?.categoryId ?? categories[0]?.id ?? 0);
+  const [walletId, setWalletId] = useState<number>(edit?.walletId ?? wallets[0]?.id ?? 0);
+  const [date, setDate] = useState(edit?.date ?? today);
+  const [memo, setMemo] = useState(edit?.memo ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // PL区分ごとにカテゴリをグループ化
   const grouped = categories.reduce<Record<string, InputCategory[]>>((acc, c) => {
     (acc[c.pl_type] ??= []).push(c);
     return acc;
@@ -47,8 +60,9 @@ export default function AddTransactionForm({
     }
     setBusy(true);
     try {
-      const res = await fetch("/api/transactions", {
-        method: "POST",
+      const url = isEdit ? `/api/transactions/${edit!.id}` : "/api/transactions";
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category_id: categoryId,
@@ -62,11 +76,14 @@ export default function AddTransactionForm({
       const data = await res.json();
       if (!data.ok) {
         setMsg("エラー: " + data.error);
+      } else if (isEdit) {
+        router.push("/transactions");
+        router.refresh();
       } else {
         setMsg("✓ 保存しました（#" + data.id + "）");
         setAmount("");
         setMemo("");
-        router.refresh(); // サーバーコンポーネントを再取得＝全数字が即更新
+        router.refresh();
       }
     } catch (e) {
       setMsg("通信エラー: " + (e instanceof Error ? e.message : ""));
@@ -89,11 +106,23 @@ export default function AddTransactionForm({
   return (
     <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-bold">取引を入力</h2>
-        <button onClick={() => setOpen(false)} className="text-slate-400 text-xl leading-none">
-          ×
-        </button>
+        <h2 className="font-bold">{isEdit ? `取引を編集（#${edit!.id}）` : "取引を入力"}</h2>
+        {isEdit ? (
+          <button onClick={() => router.push("/transactions")} className="text-slate-400 text-xl leading-none">
+            ×
+          </button>
+        ) : (
+          <button onClick={() => setOpen(false)} className="text-slate-400 text-xl leading-none">
+            ×
+          </button>
+        )}
       </div>
+
+      {isEdit && edit!.legCount > 1 && (
+        <p className="text-[11px] text-amber-600 bg-amber-50 rounded p-2">
+          ⚠️ この取引は分割払い（{edit!.legCount}脚）です。保存すると単一の決済手段に集約されます。
+        </p>
+      )}
 
       <div className="flex gap-2 text-sm">
         {(["expense", "income"] as const).map((t) => (
@@ -179,7 +208,7 @@ export default function AddTransactionForm({
         disabled={busy}
         className="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
       >
-        {busy ? "保存中..." : "保存する"}
+        {busy ? "保存中..." : isEdit ? "更新する" : "保存する"}
       </button>
       {msg && <p className="text-center text-sm text-slate-600">{msg}</p>}
     </section>

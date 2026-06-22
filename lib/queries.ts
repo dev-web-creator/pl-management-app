@@ -254,3 +254,28 @@ export async function getMonthTransactions(period = "2026-06-01"): Promise<TxRow
   );
   return rows;
 }
+
+export type TxEdit = {
+  id: number;
+  type: "expense" | "income";
+  amount: number;
+  category_id: number;
+  date: string; // 'YYYY-MM-DD'
+  memo: string | null;
+  wallet_id: number | null; // 先頭の脚（編集は単一脚に集約）
+  leg_count: number; // 2以上なら分割払い（編集で単一脚に集約される旨を警告）
+};
+
+// 編集用に取引1件を取得（先頭の支払い脚のウォレットを既定にする）。
+export async function getTransactionForEdit(id: number): Promise<TxEdit | null> {
+  const { rows } = await pool.query(
+    `SELECT t.id, t.type, t.amount, t.category_id,
+            to_char(t.accrual_date, 'YYYY-MM-DD') AS date, t.memo,
+            (SELECT wallet_id FROM transaction_legs WHERE transaction_id = t.id ORDER BY id LIMIT 1) AS wallet_id,
+            (SELECT count(*)::int FROM transaction_legs WHERE transaction_id = t.id) AS leg_count
+     FROM transactions t
+     WHERE t.id = $1 AND t.user_id = $2`,
+    [id, USER_ID]
+  );
+  return rows[0] ?? null;
+}

@@ -107,7 +107,13 @@ export default async function TransactionsPage({
                       {t.type === "income" ? "+" : "−"}
                       {yen(t.amount)}
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-right whitespace-nowrap">
+                      <Link
+                        href={`/transactions/${t.id}/edit`}
+                        className="text-xs text-sky-600 hover:underline mr-3"
+                      >
+                        編集
+                      </Link>
                       <DeleteTxButton id={t.id} />
                     </td>
                   </tr>

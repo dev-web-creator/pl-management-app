@@ -31,7 +31,33 @@ function fmt(v: unknown): string {
   return String(v);
 }
 
-export default async function Inspect() {
+export default async function Inspect({
+  searchParams,
+}: {
+  searchParams: Promise<{ key?: string }>;
+}) {
+  // ルート単位の保護（サイト全体のmiddlewareは使わない＝過去の全ルート500を回避）。
+  // 本番(production)では INSPECT_KEY 環境変数が必須＋ ?key= 一致で閲覧可。
+  // キー未設定の本番は「安全側に倒してロック」。ローカル開発(development)は常に閲覧可。
+  const { key } = await searchParams;
+  const expected = process.env.INSPECT_KEY;
+  const isProd = process.env.NODE_ENV === "production";
+  const locked = isProd ? !expected || key !== expected : false;
+  if (locked) {
+    return (
+      <main className="min-h-screen grid place-items-center p-6 text-center text-slate-700">
+        <div>
+          <h1 className="text-lg font-bold mb-2">🔒 DBインスペクターは保護されています</h1>
+          <p className="text-sm text-slate-500">
+            本番では閲覧キーが必要です。<code>?key=あなたのキー</code> を付けてアクセスしてください。
+            <br />
+            （Vercelの環境変数 <code>INSPECT_KEY</code> を設定 → <code>/inspect?key=…</code>）
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   const tables = await listTables();
   const ordered = [
     ...PREFERRED.filter((t) => tables.includes(t)),

@@ -8,6 +8,7 @@ import {
   getFixedCostPlanVsActual,
 } from "@/lib/queries";
 import AddTransactionForm from "@/components/AddTransactionForm";
+import RecordFixedCostButton from "@/components/RecordFixedCostButton";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic"; // 毎回DBから最新を取得（キャッシュしない）
@@ -178,6 +179,9 @@ export default async function Home({
                     >
                       {f.is_actual ? "実績" : "予定"}
                     </span>
+                    {!f.is_actual && (
+                      <RecordFixedCostButton ruleId={f.id} period={period} />
+                    )}
                   </span>
                 </div>
               ))}

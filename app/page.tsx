@@ -148,6 +148,9 @@ export default async function Home({
             </h2>
             <span className="text-[10px] text-slate-400">
               実績 {fixedActualCount} / {fixedItems.length} 件
+              <Link href="/fixed-costs" className="text-sky-600 hover:underline ml-2">
+                管理
+              </Link>
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mb-3">

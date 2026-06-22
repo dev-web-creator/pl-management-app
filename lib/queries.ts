@@ -279,3 +279,63 @@ export async function getTransactionForEdit(id: number): Promise<TxEdit | null> 
   );
   return rows[0] ?? null;
 }
+
+// ---- 固定費マスタ（recurring_rules）の管理 ----
+export type RecurringRule = {
+  id: number;
+  name: string;
+  amount: number;
+  category_id: number;
+  category_name: string;
+  settlement_wallet_id: number;
+  wallet_name: string | null;
+  start_month: string; // 'YYYY-MM'
+  end_month: string | null; // 'YYYY-MM' or null=継続中
+  billing_day: number | null;
+  is_active: boolean;
+};
+
+// 固定費マスタ一覧（継続中→終了済みの順）。
+export async function getRecurringRules(): Promise<RecurringRule[]> {
+  const { rows } = await pool.query(
+    `SELECT r.id, r.name, r.amount, r.category_id, c.name AS category_name,
+            r.settlement_wallet_id, w.name AS wallet_name,
+            to_char(r.start_month, 'YYYY-MM') AS start_month,
+            to_char(r.end_month,   'YYYY-MM') AS end_month,
+            r.billing_day, r.is_active
+     FROM recurring_rules r
+     JOIN categories c ON c.id = r.category_id
+     LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
+     WHERE r.user_id = $1
+     ORDER BY (r.end_month IS NOT NULL), r.amount DESC, r.id`,
+    [USER_ID]
+  );
+  return rows;
+}
+
+export async function getRecurringRuleForEdit(id: number): Promise<RecurringRule | null> {
+  const { rows } = await pool.query(
+    `SELECT r.id, r.name, r.amount, r.category_id, c.name AS category_name,
+            r.settlement_wallet_id, w.name AS wallet_name,
+            to_char(r.start_month, 'YYYY-MM') AS start_month,
+            to_char(r.end_month,   'YYYY-MM') AS end_month,
+            r.billing_day, r.is_active
+     FROM recurring_rules r
+     JOIN categories c ON c.id = r.category_id
+     LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
+     WHERE r.id = $1 AND r.user_id = $2`,
+    [id, USER_ID]
+  );
+  return rows[0] ?? null;
+}
+
+// 固定費に使える（fixed_cost の入力可）カテゴリ一覧。
+export async function getFixedCostCategories(): Promise<InputCategory[]> {
+  const { rows } = await pool.query(
+    `SELECT id, name, pl_type FROM categories
+     WHERE user_id = $1 AND pl_type = 'fixed_cost' AND is_input_allowed AND is_active
+     ORDER BY display_order, id`,
+    [USER_ID]
+  );
+  return rows;
+}

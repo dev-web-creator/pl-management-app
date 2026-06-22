@@ -25,7 +25,7 @@
 - ⬜ **サイト全体の認証**（ADR-029）：ダッシュボード等もまだ公開。Vercel Previewで検証した安定middlewareで。実データ投入前に。
 - ✅ **取引一覧ビュー**（`/transactions`・月切替・**削除**・**編集**）：一覧＋`DELETE`＋`PUT /api/transactions/[id]`＋`/transactions/[id]/edit`（フォーム流用）。分割払いは編集で単一脚に集約。
 - ✅ 固定費「実額で記録」ワンタップ（ADR-030次段）：`POST /api/recurring/post`＋`RecordFixedCostButton`。予定行から1タップで当月の実額取引化（重複ガードあり）。
-- ⬜ `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値へ
+- ✅ **固定費マスタ管理UI**（`/fixed-costs`）：アプリ内で追加/編集/解約(終了年月)/削除。`/api/recurring`(POST)・`/api/recurring/[id]`(PUT/DELETE)・`RecurringForm`。→ **実値はユーザーがUIから直接入力可**（seedの🔶仮置きはUIで上書きしていく方針）。
 
 ### P2（運用の幅）
 - ⬜ 振替／チャージ／クレカ消込のUI（`transfers`・ADR-003/024）

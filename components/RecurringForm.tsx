@@ -1,0 +1,192 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { InputCategory, WalletOption } from "@/lib/queries";
+
+export type RecurringEdit = {
+  id: number;
+  name: string;
+  amount: number;
+  categoryId: number;
+  walletId: number;
+  startMonth: string; // 'YYYY-MM'
+  endMonth: string | null; // 'YYYY-MM' or null
+  billingDay: number | null;
+};
+
+export default function RecurringForm({
+  categories,
+  wallets,
+  defaultMonth,
+  edit,
+}: {
+  categories: InputCategory[];
+  wallets: WalletOption[];
+  defaultMonth: string; // 'YYYY-MM'
+  edit?: RecurringEdit;
+}) {
+  const router = useRouter();
+  const isEdit = !!edit;
+  const [open, setOpen] = useState(isEdit);
+  const [name, setName] = useState(edit?.name ?? "");
+  const [amount, setAmount] = useState(edit ? String(edit.amount) : "");
+  const [categoryId, setCategoryId] = useState<number>(edit?.categoryId ?? categories[0]?.id ?? 0);
+  const [walletId, setWalletId] = useState<number>(edit?.walletId ?? wallets[0]?.id ?? 0);
+  const [startMonth, setStartMonth] = useState(edit?.startMonth ?? defaultMonth);
+  const [endMonth, setEndMonth] = useState(edit?.endMonth ?? "");
+  const [billingDay, setBillingDay] = useState(edit?.billingDay ? String(edit.billingDay) : "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function submit() {
+    setMsg(null);
+    const amt = parseInt(amount, 10);
+    if (!name.trim()) return setMsg("名称を入力してください");
+    if (isNaN(amt) || amt < 0) return setMsg("金額を入力してください");
+    setBusy(true);
+    try {
+      const url = isEdit ? `/api/recurring/${edit!.id}` : "/api/recurring";
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          category_id: categoryId,
+          amount: amt,
+          settlement_wallet_id: walletId,
+          start_month: startMonth,
+          end_month: endMonth || undefined,
+          billing_day: billingDay ? parseInt(billingDay, 10) : undefined,
+        }),
+      });
+      const d = await res.json();
+      if (!d.ok) {
+        setMsg("エラー: " + d.error);
+      } else {
+        router.push("/fixed-costs");
+        router.refresh();
+      }
+    } catch (e) {
+      setMsg("通信エラー: " + (e instanceof Error ? e.message : ""));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full bg-slate-900 text-white rounded-2xl py-3 font-semibold shadow-sm hover:bg-slate-700"
+      >
+        ＋ 固定費を追加
+      </button>
+    );
+  }
+
+  return (
+    <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold">{isEdit ? `固定費を編集（#${edit!.id}）` : "固定費を追加"}</h2>
+        <button
+          onClick={() => (isEdit ? router.push("/fixed-costs") : setOpen(false))}
+          className="text-slate-400 text-xl leading-none"
+        >
+          ×
+        </button>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-500">名称</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="例：家賃（SA麻布十番）"
+          className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-slate-500">月額（予定）</label>
+          <input
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="¥0"
+            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">カテゴリ（固定費）</label>
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(Number(e.target.value))}
+            className="w-full mt-1 border rounded-lg px-2 py-2 text-sm"
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">引落先ウォレット</label>
+          <select
+            value={walletId}
+            onChange={(e) => setWalletId(Number(e.target.value))}
+            className="w-full mt-1 border rounded-lg px-2 py-2 text-sm"
+          >
+            {wallets.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">引落日（任意・1〜31）</label>
+          <input
+            inputMode="numeric"
+            value={billingDay}
+            onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+            placeholder="例：27"
+            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">開始年月</label>
+          <input
+            type="month"
+            value={startMonth}
+            onChange={(e) => setStartMonth(e.target.value)}
+            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">終了年月（＝解約。空＝継続中）</label>
+          <input
+            type="month"
+            value={endMonth}
+            onChange={(e) => setEndMonth(e.target.value)}
+            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+      <p className="text-[11px] text-slate-400">
+        終了年月をセットすると、その月から自動で計上対象外になります（履歴は残ります）。解約はこれでOK。
+      </p>
+
+      <button
+        onClick={submit}
+        disabled={busy}
+        className="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl disabled:opacity-50"
+      >
+        {busy ? "保存中..." : isEdit ? "更新する" : "追加する"}
+      </button>
+      {msg && <p className="text-center text-sm text-slate-600">{msg}</p>}
+    </section>
+  );
+}

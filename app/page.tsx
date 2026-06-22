@@ -108,6 +108,9 @@ export default async function Home({
             <Link href={`/budget?m=${period}`} className="text-sky-600 hover:underline">
               予実
             </Link>
+            <Link href="/cards" className="text-sky-600 hover:underline">
+              カード
+            </Link>
             <Link href="/inspect" className="text-sky-600 hover:underline">
               🔍 DB
             </Link>

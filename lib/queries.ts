@@ -148,6 +148,43 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- クレカ請求サイクル（ADR-023） ----
+export type CardLeg = {
+  card_id: number;
+  card_name: string;
+  closing_day: number | null;
+  closing_eom: boolean;
+  payment_day: number | null;
+  payment_eom: boolean;
+  payment_month_offset: number;
+  settlement_name: string | null;
+  tx_id: number;
+  date: string; // 'YYYY-MM-DD'
+  amount: number;
+  category: string;
+  memo: string | null;
+};
+
+// クレカで支払った取引脚（カード設定つき）。請求サイクルの判定はアプリ側で行う（ADR-023）。
+export async function getCardLegs(): Promise<CardLeg[]> {
+  const { rows } = await pool.query(
+    `SELECT w.id AS card_id, w.name AS card_name,
+            w.closing_day, w.closing_eom, w.payment_day, w.payment_eom, w.payment_month_offset,
+            sw.name AS settlement_name,
+            t.id AS tx_id, to_char(t.accrual_date,'YYYY-MM-DD') AS date, tl.amount,
+            c.name AS category, t.memo
+     FROM transaction_legs tl
+     JOIN wallets w ON w.id = tl.wallet_id AND w.type='credit_card'
+     JOIN transactions t ON t.id = tl.transaction_id
+     JOIN categories c ON c.id = t.category_id
+     LEFT JOIN wallets sw ON sw.id = w.settlement_wallet_id
+     WHERE w.user_id=$1 AND t.type='expense'
+     ORDER BY w.id, t.accrual_date`,
+    [USER_ID]
+  );
+  return rows;
+}
+
 // ---- 予実管理（ADR-016/020） ----
 export type BudgetVsActual = {
   target_income: number;

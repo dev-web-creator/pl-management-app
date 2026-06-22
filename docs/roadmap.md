@@ -29,7 +29,7 @@
 
 ### P2（運用の幅）
 - ✅ 振替／チャージ／カード支払いのUI（`/transfers`・`POST /api/transfers`・`DELETE /api/transfers/[id]`・`AddTransferForm`）。残高に連動・PL非計上。※クレカ請求サイクル(card_statements)との厳密な消込は ADR-023 実装時に。
-- ⬜ クレカ請求サイクルの自動判定＋カードビュー（ADR-023）
+- ✅ クレカ請求サイクル＋カードビュー（`/cards`）：発生日＋締め日から請求サイクルを自動判定し、カード別・締め別の引落予定額と「次回引落」を表示（ADR-023）。`getCardLegs`＋アプリ側で締め/引落日を算出。脚ベースなので分割払いのカード負担分も正しく集計。
 - ⬜ 分割払いの入力UI（schema対応済・フォーム未対応・ADR-025）
 - ✅ 予実（`/budget`）：収入/支出/収支の目標×実績・達成率・差異、月次確定（黒塗り `monthly_closings`）。`getBudgetVsActual`・`/api/targets`・`/api/closings`・`BudgetForm`・`ConfirmMonthButton`（ADR-016/018/020）。
 

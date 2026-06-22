@@ -139,12 +139,14 @@ export default async function Home({
           </div>
         </section>
 
-        {/* 資産サマリ */}
-        <section className="grid grid-cols-3 gap-3">
-          <Stat label="総資産" value={assets.total_assets} />
-          <Stat label="カード未払い" value={assets.card_unpaid} negative />
-          <Stat label="純資産" value={assets.net_assets} accent />
-        </section>
+        {/* 資産サマリ（タップで資産ダッシュボードへ） */}
+        <Link href="/assets" className="block">
+          <section className="grid grid-cols-3 gap-3">
+            <Stat label="総資産" value={assets.total_assets} />
+            <Stat label="カード未払い" value={assets.card_unpaid} negative />
+            <Stat label="純資産 ›" value={assets.net_assets} accent />
+          </section>
+        </Link>
 
         {/* 固定費（予実：マスタの予定 / 実績） */}
         <section className="bg-white rounded-2xl shadow-sm p-5">

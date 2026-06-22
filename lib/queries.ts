@@ -148,6 +148,88 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- 資産ダッシュボード（ADR-027） ----
+export type AssetTrendPoint = { month: string; total_assets: number; net_assets: number };
+
+// 月末時点の総資産・純資産の推移（最低6ヶ月）。取引・振替の累計から算出。
+export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
+  const { rows } = await pool.query(
+    `WITH bounds AS (
+       SELECT LEAST(
+                date_trunc('month', COALESCE((SELECT MIN(accrual_date) FROM transactions WHERE user_id=$1), CURRENT_DATE))::date,
+                (date_trunc('month', CURRENT_DATE) - interval '5 months')::date
+              ) AS start_m,
+              date_trunc('month', CURRENT_DATE)::date AS end_m
+     ),
+     months AS (SELECT generate_series((SELECT start_m FROM bounds),(SELECT end_m FROM bounds), interval '1 month')::date AS m),
+     aw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type<>'credit_card'),
+     cw AS (SELECT id FROM wallets WHERE user_id=$1 AND type='credit_card'),
+     init AS (SELECT COALESCE(SUM(initial_balance),0) AS v FROM wallets WHERE user_id=$1 AND include_in_assets AND type<>'credit_card')
+     SELECT to_char(mo.m,'YYYY-MM') AS month,
+       ((SELECT v FROM init)
+        + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END)
+                    FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
+                    WHERE t.user_id=$1 AND tl.wallet_id IN (SELECT id FROM aw) AND t.accrual_date < (mo.m + interval '1 month')),0)
+        + COALESCE((SELECT SUM(amount)     FROM transfers WHERE user_id=$1 AND to_wallet_id   IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
+        - COALESCE((SELECT SUM(amount+fee) FROM transfers WHERE user_id=$1 AND from_wallet_id IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
+       )::int AS total_assets,
+       ( COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END)
+                    FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
+                    WHERE t.user_id=$1 AND tl.wallet_id IN (SELECT id FROM cw) AND t.accrual_date < (mo.m + interval '1 month')),0)
+        + COALESCE((SELECT SUM(amount)     FROM transfers WHERE user_id=$1 AND to_wallet_id   IN (SELECT id FROM cw) AND transfer_date < (mo.m + interval '1 month')),0)
+        - COALESCE((SELECT SUM(amount+fee) FROM transfers WHERE user_id=$1 AND from_wallet_id IN (SELECT id FROM cw) AND transfer_date < (mo.m + interval '1 month')),0)
+       )::int AS card_balance
+     FROM months mo ORDER BY mo.m`,
+    [USER_ID]
+  );
+  return rows.map((r) => ({
+    month: r.month,
+    total_assets: r.total_assets,
+    net_assets: r.total_assets + r.card_balance, // card_balanceは負（未払い）
+  }));
+}
+
+export type AssetTypeTotal = { type: string; total: number };
+
+// 現在の資産内訳（種別別・資産系のみ）。
+export async function getAssetBreakdown(): Promise<AssetTypeTotal[]> {
+  const { rows } = await pool.query(
+    `WITH legs AS (
+       SELECT tl.wallet_id, SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END) AS d
+       FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
+       WHERE t.user_id=$1 GROUP BY tl.wallet_id
+     ),
+     tr_in  AS (SELECT to_wallet_id   AS wid, SUM(amount)     AS a FROM transfers WHERE user_id=$1 GROUP BY to_wallet_id),
+     tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
+     bal AS (
+       SELECT w.type, w.include_in_assets,
+         (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)) AS balance
+       FROM wallets w
+       LEFT JOIN legs ON legs.wallet_id=w.id LEFT JOIN tr_in ON tr_in.wid=w.id LEFT JOIN tr_out ON tr_out.wid=w.id
+       WHERE w.user_id=$1
+     )
+     SELECT type, SUM(balance)::int AS total FROM bal
+     WHERE include_in_assets AND type<>'credit_card'
+     GROUP BY type HAVING SUM(balance) <> 0 ORDER BY total DESC`,
+    [USER_ID]
+  );
+  return rows;
+}
+
+export type MonthTotal = { month: string; total: number };
+
+// 配当（投資収益(配当)）の月次推移。
+export async function getDividendTrend(): Promise<MonthTotal[]> {
+  const { rows } = await pool.query(
+    `SELECT to_char(date_trunc('month', t.accrual_date),'YYYY-MM') AS month, SUM(t.amount)::int AS total
+     FROM transactions t JOIN categories c ON c.id=t.category_id
+     WHERE t.user_id=$1 AND t.type='income' AND c.name='投資収益(配当)'
+     GROUP BY 1 ORDER BY 1`,
+    [USER_ID]
+  );
+  return rows;
+}
+
 export type CategoryTotal = { id: number; name: string; total: number };
 
 // 変動費グループ（ルート）ごとの配下合計（再帰ロールアップ）。指定月のみ集計。

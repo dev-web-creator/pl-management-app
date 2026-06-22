@@ -35,7 +35,7 @@
 
 ### P3（発展）
 - ✅ 給与明細の入力（`/payslips`・`/payslips/[period]/edit`・`POST /api/payslips`[月ごとupsert]・`DELETE /api/payslips/[id]`・`PayslipForm`）。支給/控除を動的行で入力→総支給・控除合計・手取り・時給換算を自動計算。税/社保は控除で管理（支出非計上・ADR-022）。**OCRは後段**。
-- ⬜ 資産ダッシュボード：総資産推移グラフ・月末スナップショット・配当・資産目標達成率（ADR-027）
+- ✅ 資産ダッシュボード（`/assets`）：総資産の推移（インラインSVG）・種別内訳・配当推移。`getAssetTrend`/`getAssetBreakdown`/`getDividendTrend`。※残高スナップショットの手動リコンサイル・資産目標達成率(targets連動)は次段（達成率は予実=Aと一緒に）。
 - ⬜ マルチユーザー / ログイン（今は `USER_ID=1` 固定・ADR-004）
 - ⬜ FY（年度）年次ロールアップ・複数FY比較（ADR-007/017）
 - ⬜ ビジョン/目標レイヤー（30歳目標等）を入れるか判断（要確認事項）

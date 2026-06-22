@@ -352,6 +352,83 @@ export type TransferRow = {
   to_name: string;
 };
 
+// ---- 給与明細（payslips / payslip_items） ----
+export type PayslipSummary = {
+  id: number;
+  period: string; // 'YYYY-MM'
+  gross: number; // 総支給額（支給合計）
+  deduction: number; // 控除合計
+  net: number; // 手取り（gross - deduction）
+  total_work_hours: number | null;
+  overtime_hours: number | null;
+  hourly: number | null; // 時給換算（総支給 ÷ 総労働時間）
+  is_confirmed: boolean;
+};
+
+export async function getPayslips(): Promise<PayslipSummary[]> {
+  const { rows } = await pool.query(
+    `SELECT p.id, to_char(p.period,'YYYY-MM') AS period,
+            p.total_work_hours, p.overtime_hours, p.is_confirmed,
+            COALESCE((SELECT SUM(amount) FROM payslip_items i WHERE i.payslip_id=p.id AND i.item_type='allowance'),0)::int AS gross,
+            COALESCE((SELECT SUM(amount) FROM payslip_items i WHERE i.payslip_id=p.id AND i.item_type='deduction'),0)::int AS deduction
+     FROM payslips p WHERE p.user_id=$1 ORDER BY p.period DESC`,
+    [USER_ID]
+  );
+  return rows.map((r) => {
+    const wh = r.total_work_hours != null ? Number(r.total_work_hours) : null;
+    const net = r.gross - r.deduction;
+    return {
+      id: r.id,
+      period: r.period,
+      gross: r.gross,
+      deduction: r.deduction,
+      net,
+      total_work_hours: wh,
+      overtime_hours: r.overtime_hours != null ? Number(r.overtime_hours) : null,
+      hourly: wh && wh > 0 ? Math.round(r.gross / wh) : null,
+      is_confirmed: r.is_confirmed,
+    };
+  });
+}
+
+export type PayslipItemRow = { name: string; amount: number };
+export type PayslipEdit = {
+  id: number | null;
+  period: string; // 'YYYY-MM'
+  total_work_hours: string;
+  overtime_hours: string;
+  is_confirmed: boolean;
+  allowances: PayslipItemRow[];
+  deductions: PayslipItemRow[];
+};
+
+// 指定月（'YYYY-MM'）の給与明細を編集用に取得。無ければ空を返す。
+export async function getPayslipForEdit(period: string): Promise<PayslipEdit> {
+  const p = `${period}-01`;
+  const ps = await pool.query(
+    `SELECT id, total_work_hours, overtime_hours, is_confirmed
+     FROM payslips WHERE user_id=$1 AND period=$2`,
+    [USER_ID, p]
+  );
+  if (ps.rowCount === 0) {
+    return { id: null, period, total_work_hours: "", overtime_hours: "", is_confirmed: false, allowances: [], deductions: [] };
+  }
+  const row = ps.rows[0];
+  const items = await pool.query(
+    `SELECT item_type, name, amount FROM payslip_items WHERE payslip_id=$1 ORDER BY id`,
+    [row.id]
+  );
+  return {
+    id: row.id,
+    period,
+    total_work_hours: row.total_work_hours != null ? String(Number(row.total_work_hours)) : "",
+    overtime_hours: row.overtime_hours != null ? String(Number(row.overtime_hours)) : "",
+    is_confirmed: row.is_confirmed,
+    allowances: items.rows.filter((i) => i.item_type === "allowance").map((i) => ({ name: i.name, amount: i.amount })),
+    deductions: items.rows.filter((i) => i.item_type === "deduction").map((i) => ({ name: i.name, amount: i.amount })),
+  };
+}
+
 // 指定月の資金移動一覧。
 export async function getMonthTransfers(period = "2026-06-01"): Promise<TransferRow[]> {
   const { rows } = await pool.query(

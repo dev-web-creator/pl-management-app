@@ -34,7 +34,7 @@
 - ⬜ 予実：収入/支出/収支の `targets` × 実績、月次確定（黒塗り `monthly_closings`）（ADR-016/020）
 
 ### P3（発展）
-- ⬜ 給与明細の入力 / OCR（`payslips`・ADR-009/022）
+- ✅ 給与明細の入力（`/payslips`・`/payslips/[period]/edit`・`POST /api/payslips`[月ごとupsert]・`DELETE /api/payslips/[id]`・`PayslipForm`）。支給/控除を動的行で入力→総支給・控除合計・手取り・時給換算を自動計算。税/社保は控除で管理（支出非計上・ADR-022）。**OCRは後段**。
 - ⬜ 資産ダッシュボード：総資産推移グラフ・月末スナップショット・配当・資産目標達成率（ADR-027）
 - ⬜ マルチユーザー / ログイン（今は `USER_ID=1` 固定・ADR-004）
 - ⬜ FY（年度）年次ロールアップ・複数FY比較（ADR-007/017）

@@ -13,7 +13,7 @@
 BEGIN;
 
 -- 既存を作り直す場合（開発用）。本番では使わない。
-DROP TABLE IF EXISTS balance_snapshots, payslip_items, payslips,
+DROP TABLE IF EXISTS vision_notes, balance_snapshots, payslip_items, payslips,
   monthly_closings, targets, transaction_legs, transactions,
   transfers, card_statements, recurring_rules, categories, wallets, users CASCADE;
 DROP FUNCTION IF EXISTS set_updated_at CASCADE;
@@ -275,6 +275,17 @@ CREATE TABLE balance_snapshots (
   actual_balance integer NOT NULL,     -- 実残高(手入力)
   created_at     timestamptz NOT NULL DEFAULT now(),
   UNIQUE (wallet_id, as_of_date)
+);
+
+-- ------------------------------------------------------------
+-- 14. vision_notes（ビジョン/目標の自由記述：1ユーザー1箱）
+-- ------------------------------------------------------------
+CREATE TABLE vision_notes (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content    text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id)
 );
 
 COMMIT;

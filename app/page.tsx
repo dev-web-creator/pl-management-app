@@ -120,6 +120,9 @@ export default async function Home({
             <Link href="/year" className="text-sky-600 hover:underline">
               年次
             </Link>
+            <Link href="/vision" className="text-sky-600 hover:underline">
+              目標
+            </Link>
             <Link href="/inspect" className="text-sky-600 hover:underline">
               🔍 DB
             </Link>

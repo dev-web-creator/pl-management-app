@@ -148,6 +148,12 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- ビジョン/目標（自由記述の箱） ----
+export async function getVisionNote(): Promise<string> {
+  const { rows } = await pool.query(`SELECT content FROM vision_notes WHERE user_id=$1`, [USER_ID]);
+  return rows[0]?.content ?? "";
+}
+
 // ---- 残高リコンサイル（実残高との照合 / ADR-027） ----
 export type ReconcileRow = {
   id: number;

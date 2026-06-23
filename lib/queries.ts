@@ -148,6 +148,46 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- 残高リコンサイル（実残高との照合 / ADR-027） ----
+export type ReconcileRow = {
+  id: number;
+  name: string;
+  type: string;
+  computed: number; // 自動算出残高
+  actual: number | null; // 直近に記録した実残高
+  as_of: string | null; // その基準日
+};
+
+export async function getReconcileData(): Promise<ReconcileRow[]> {
+  const { rows } = await pool.query(
+    `WITH legs AS (
+       SELECT tl.wallet_id, SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END) AS d
+       FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
+       WHERE t.user_id=$1 GROUP BY tl.wallet_id
+     ),
+     tr_in  AS (SELECT to_wallet_id   AS wid, SUM(amount)     AS a FROM transfers WHERE user_id=$1 GROUP BY to_wallet_id),
+     tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
+     bal AS (
+       SELECT w.id, w.name, w.type, w.is_balance_tracked,
+         (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0))::int AS balance
+       FROM wallets w
+       LEFT JOIN legs ON legs.wallet_id=w.id LEFT JOIN tr_in ON tr_in.wid=w.id LEFT JOIN tr_out ON tr_out.wid=w.id
+       WHERE w.user_id=$1
+     )
+     SELECT b.id, b.name, b.type, b.balance AS computed,
+            s.actual_balance AS actual, to_char(s.as_of_date,'YYYY-MM-DD') AS as_of
+     FROM bal b
+     LEFT JOIN LATERAL (
+       SELECT actual_balance, as_of_date FROM balance_snapshots s
+       WHERE s.wallet_id=b.id ORDER BY as_of_date DESC LIMIT 1
+     ) s ON true
+     WHERE b.is_balance_tracked
+     ORDER BY b.type, b.id`,
+    [USER_ID]
+  );
+  return rows;
+}
+
 // ---- FY（会計年度）年次ビュー（ADR-007/017） ----
 export async function getUserFyStartMonth(): Promise<number> {
   const { rows } = await pool.query(`SELECT fiscal_year_start_month FROM users WHERE id=$1`, [USER_ID]);

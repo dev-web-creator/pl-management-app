@@ -49,9 +49,10 @@ export default async function AssetsPage() {
       <div className="max-w-3xl mx-auto space-y-6">
         <header className="flex items-center justify-between">
           <h1 className="text-xl font-bold">資産ダッシュボード</h1>
-          <Link href="/" className="text-xs text-sky-600 hover:underline">
-            ← ダッシュボード
-          </Link>
+          <div className="flex items-center gap-3 text-xs">
+            <Link href="/reconcile" className="text-sky-600 hover:underline">残高照合</Link>
+            <Link href="/" className="text-sky-600 hover:underline">← ダッシュボード</Link>
+          </div>
         </header>
 
         {/* 現在のサマリ */}

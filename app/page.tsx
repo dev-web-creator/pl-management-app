@@ -54,7 +54,7 @@ export default async function Home({
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const formDefaultDate = period === thisMonth ? todayStr : period;
 
-  const [pl, wallets, assets, varGroups, inputCats, walletOpts, fixedItems] =
+  const [pl, wallets, assets, varGroups, inputCats, walletOpts, fixedItems, prevPl, prevFixedItems] =
     await Promise.all([
       getPLSummary(period),
       getWalletBalances(),
@@ -63,6 +63,8 @@ export default async function Home({
       getInputCategories(),
       getWalletOptions(),
       getFixedCostPlanVsActual(period),
+      getPLSummary(prevMonth),
+      getFixedCostPlanVsActual(prevMonth),
     ]);
 
   // 固定費は予実突合（ADR-030）：各項目 実額があれば実額、無ければ予定額。
@@ -71,6 +73,10 @@ export default async function Home({
   const fixedActualCount = fixedItems.filter((f) => f.is_actual).length;
   // 月次黒字＝可処分所得 −（固定費[実績優先] ＋ 変動費）
   const surplus = pl.disposable - fixedEffective - pl.variable;
+  // 前月比（同じ定義で前月の黒字を算出）
+  const prevSurplus =
+    prevPl.disposable - prevFixedItems.reduce((s, f) => s + f.effective, 0) - prevPl.variable;
+  const surplusDelta = surplus - prevSurplus;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 px-4 py-6">
@@ -111,6 +117,9 @@ export default async function Home({
             <Link href="/cards" className="text-sky-600 hover:underline">
               カード
             </Link>
+            <Link href="/year" className="text-sky-600 hover:underline">
+              年次
+            </Link>
             <Link href="/inspect" className="text-sky-600 hover:underline">
               🔍 DB
             </Link>
@@ -141,6 +150,15 @@ export default async function Home({
             <span className="font-bold">月次黒字（貯蓄に回る額）</span>
             <span className="text-2xl font-extrabold text-emerald-600 tabular-nums">
               {yen(surplus)}
+            </span>
+          </div>
+          <div className="flex justify-end text-xs">
+            <span className="text-slate-400">
+              前月比{" "}
+              <span className={surplusDelta >= 0 ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>
+                {surplusDelta >= 0 ? "+" : "−"}{yen(Math.abs(surplusDelta))}
+              </span>
+              <span className="ml-1">（前月 {yen(prevSurplus)}）</span>
             </span>
           </div>
         </section>

@@ -148,6 +148,37 @@ export async function getTableDump(table: string): Promise<TableDump> {
   };
 }
 
+// ---- FY（会計年度）年次ビュー（ADR-007/017） ----
+export async function getUserFyStartMonth(): Promise<number> {
+  const { rows } = await pool.query(`SELECT fiscal_year_start_month FROM users WHERE id=$1`, [USER_ID]);
+  return rows[0]?.fiscal_year_start_month ?? 4;
+}
+
+export type FyMonthPL = { month: string; income: number; fixed: number; variable: number; surplus: number };
+
+// FY開始月(月初日)から12ヶ月分の月次PL。固定費は実績(fixed_cost取引)ベース。
+export async function getFiscalYearPL(startPeriod: string): Promise<FyMonthPL[]> {
+  const { rows } = await pool.query(
+    `WITH months AS (
+       SELECT generate_series($2::date, ($2::date + interval '11 months'), interval '1 month')::date AS m
+     ),
+     agg AS (
+       SELECT date_trunc('month', t.accrual_date)::date AS mo, c.pl_type, t.type, SUM(t.amount) AS amt
+       FROM transactions t JOIN categories c ON c.id=t.category_id
+       WHERE t.user_id=$1 AND t.accrual_date >= $2::date AND t.accrual_date < ($2::date + interval '12 months')
+       GROUP BY 1,2,3
+     )
+     SELECT to_char(mo.m,'YYYY-MM') AS month,
+       COALESCE(SUM(amt) FILTER (WHERE type='income'  AND pl_type='income'),0)::int        AS income,
+       COALESCE(SUM(amt) FILTER (WHERE type='expense' AND pl_type='fixed_cost'),0)::int    AS fixed,
+       COALESCE(SUM(amt) FILTER (WHERE type='expense' AND pl_type='variable_cost'),0)::int AS variable
+     FROM months mo LEFT JOIN agg ON agg.mo = mo.m
+     GROUP BY mo.m ORDER BY mo.m`,
+    [USER_ID, startPeriod]
+  );
+  return rows.map((r) => ({ ...r, surplus: r.income - r.fixed - r.variable }));
+}
+
 // ---- クレカ請求サイクル（ADR-023） ----
 export type CardLeg = {
   card_id: number;

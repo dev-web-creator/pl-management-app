@@ -77,54 +77,34 @@ export default async function Home({
   const prevSurplus =
     prevPl.disposable - prevFixedItems.reduce((s, f) => s + f.effective, 0) - prevPl.variable;
   const surplusDelta = surplus - prevSurplus;
+  const savingsRate = pl.disposable > 0 ? Math.round((surplus / pl.disposable) * 100) : null;
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900 px-4 py-6">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+    <main className="min-h-screen px-4 py-7">
+      <div className="max-w-3xl mx-auto space-y-5">
+        <header className="flex items-end justify-between">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.22em] uppercase text-[var(--muted)]">
+              Monthly P/L
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight tabular-nums mt-0.5">
+              {monthLabel(period)}
+            </h1>
+          </div>
+          <div className="flex items-center gap-0.5 bg-white border border-[var(--line)] rounded-xl p-1">
             <Link
               href={`/?m=${prevMonth}`}
-              className="text-slate-400 hover:text-slate-900 text-lg leading-none px-1"
+              className="w-8 h-8 grid place-items-center rounded-lg text-[var(--muted)] hover:bg-black/5"
               aria-label="前の月"
             >
               ‹
             </Link>
-            <h1 className="text-xl font-bold tabular-nums">
-              My PL ・ {monthLabel(period)}
-            </h1>
             <Link
               href={`/?m=${nextMonth}`}
-              className="text-slate-400 hover:text-slate-900 text-lg leading-none px-1"
+              className="w-8 h-8 grid place-items-center rounded-lg text-[var(--muted)] hover:bg-black/5"
               aria-label="次の月"
             >
               ›
-            </Link>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <Link href={`/transactions?m=${period}`} className="text-sky-600 hover:underline">
-              取引一覧
-            </Link>
-            <Link href={`/transfers?m=${period}`} className="text-sky-600 hover:underline">
-              振替
-            </Link>
-            <Link href="/payslips" className="text-sky-600 hover:underline">
-              給与
-            </Link>
-            <Link href={`/budget?m=${period}`} className="text-sky-600 hover:underline">
-              予実
-            </Link>
-            <Link href="/cards" className="text-sky-600 hover:underline">
-              カード
-            </Link>
-            <Link href="/year" className="text-sky-600 hover:underline">
-              年次
-            </Link>
-            <Link href="/vision" className="text-sky-600 hover:underline">
-              目標
-            </Link>
-            <Link href="/inspect" className="text-sky-600 hover:underline">
-              🔍 DB
             </Link>
           </div>
         </header>
@@ -136,34 +116,57 @@ export default async function Home({
           today={formDefaultDate}
         />
 
-        {/* PLサマリ */}
-        <section className="bg-white rounded-2xl shadow-sm p-5 space-y-2">
-          <h2 className="text-sm font-semibold text-slate-500 mb-2">
-            {monthLabel(period)}のPL（損益計算書）
-          </h2>
-          <Row label="可処分所得（手取り・トップライン）" value={pl.disposable} bold />
-          <div className="text-xs text-slate-400 text-right">
-            （PL対象外）経費精算など {yen(pl.excluded)} は残高に反映・損益には含めず
-          </div>
-          <hr />
-          <Row label="− 固定費（実績優先）" value={fixedEffective} className="text-indigo-500" />
-          <Row label="− 変動費" value={pl.variable} className="text-amber-500" />
-          <hr />
-          <div className="flex items-center justify-between bg-emerald-50 -mx-2 px-3 py-2 rounded-xl">
-            <span className="font-bold">月次黒字（貯蓄に回る額）</span>
-            <span className="text-2xl font-extrabold text-emerald-600 tabular-nums">
-              {yen(surplus)}
+        {/* 損益のヒーロー：月次黒字を主役に */}
+        <section className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-[var(--muted)]">
+                月次黒字 · Bottom line
+              </p>
+              <div
+                className={
+                  "mt-1 text-[2.75rem] leading-none font-extrabold tabular-nums " +
+                  (surplus >= 0 ? "text-[var(--positive)]" : "text-[var(--negative)]")
+                }
+              >
+                {surplus < 0 ? "−" : ""}
+                {yen(Math.abs(surplus))}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                {savingsRate != null && (
+                  <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 rounded-full px-2.5 py-1 font-medium tabular-nums">
+                    貯蓄率 {savingsRate}%
+                  </span>
+                )}
+                <span
+                  className={
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium tabular-nums " +
+                    (surplusDelta >= 0 ? "bg-emerald-50 text-[var(--positive)]" : "bg-red-50 text-[var(--negative)]")
+                  }
+                >
+                  前月比 {surplusDelta >= 0 ? "+" : "−"}{yen(Math.abs(surplusDelta))}
+                </span>
+              </div>
+            </div>
+            <span
+              className={
+                "shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full " +
+                (surplus >= 0 ? "bg-emerald-50 text-[var(--positive)]" : "bg-red-50 text-[var(--negative)]")
+              }
+            >
+              {surplus >= 0 ? "黒字" : "赤字"}
             </span>
           </div>
-          <div className="flex justify-end text-xs">
-            <span className="text-slate-400">
-              前月比{" "}
-              <span className={surplusDelta >= 0 ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>
-                {surplusDelta >= 0 ? "+" : "−"}{yen(Math.abs(surplusDelta))}
-              </span>
-              <span className="ml-1">（前月 {yen(prevSurplus)}）</span>
-            </span>
+
+          {/* 損益の内訳（帳簿） */}
+          <div className="mt-5 border-t border-[var(--line)] pt-4 space-y-2.5">
+            <LedgerRow label="可処分所得" sub="手取り・トップライン" value={pl.disposable} color="#0ea5e9" />
+            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#6366f1" />
+            <LedgerRow label="変動費" value={-pl.variable} color="#f59e0b" />
           </div>
+          <p className="mt-3 text-[11px] text-[var(--muted)]">
+            （PL対象外）経費精算など {yen(pl.excluded)} は残高に反映し、損益には含めません。
+          </p>
         </section>
 
         {/* 資産サマリ（タップで資産ダッシュボードへ） */}
@@ -315,22 +318,29 @@ export default async function Home({
   );
 }
 
-function Row({
+function LedgerRow({
   label,
+  sub,
   value,
-  bold,
-  className = "",
+  color,
 }: {
   label: string;
+  sub?: string;
   value: number;
-  bold?: boolean;
-  className?: string;
+  color: string;
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={bold ? "font-semibold" : className}>{label}</span>
-      <span className={"tabular-nums " + (bold ? "text-lg font-bold" : className)}>
-        {yen(value)}
+      <span className="flex items-center gap-2.5">
+        <span className="w-1.5 h-5 rounded-full" style={{ background: color }} />
+        <span className="text-sm">
+          <span className="font-medium">{label}</span>
+          {sub && <span className="text-[11px] text-[var(--muted)] ml-1.5">{sub}</span>}
+        </span>
+      </span>
+      <span className="text-sm font-semibold tabular-nums">
+        {value < 0 ? "−" : ""}
+        {yen(Math.abs(value))}
       </span>
     </div>
   );
@@ -348,12 +358,12 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 text-center">
-      <div className="text-[11px] text-slate-500">{label}</div>
+    <div className="bg-white rounded-2xl shadow-sm p-4">
+      <div className="text-[10px] font-semibold tracking-wider uppercase text-[var(--muted)]">{label}</div>
       <div
         className={
-          "text-lg font-bold tabular-nums " +
-          (negative ? "text-red-500" : accent ? "text-emerald-600" : "")
+          "mt-1 text-lg font-extrabold tabular-nums " +
+          (negative ? "text-[var(--negative)]" : accent ? "text-[var(--positive)]" : "text-[var(--ink)]")
         }
       >
         {negative ? "−" : ""}

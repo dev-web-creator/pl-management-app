@@ -1,1 +1,100 @@
 @import "tailwindcss";
+
+/* ============================================================
+   Ledger Terminal — デザイントークン
+   ============================================================ */
+:root {
+  --ink: #0b1221;          /* 主要テキスト・ダークバー */
+  --paper: #f4f6f9;        /* 背景（紙） */
+  --surface: #ffffff;      /* カード面 */
+  --line: #e7ebf1;         /* ヘアライン罫 */
+  --muted: #64748b;        /* 補助テキスト */
+  --positive: #059669;     /* 黒字 */
+  --negative: #dc2626;     /* 赤字 */
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-jakarta), var(--font-noto-jp), system-ui, sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  /* 紙のキャンバス：ごく淡い冷色＋翠のグロー */
+  background:
+    radial-gradient(1100px 560px at 100% -8%, #e9eef6 0%, transparent 58%),
+    radial-gradient(900px 480px at -8% -4%, #e8f3ee 0%, transparent 52%),
+    var(--paper);
+  background-attachment: fixed;
+}
+
+/* 数字は等幅でビシッと揃える */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* 見出しを少し締める */
+h1, h2 {
+  letter-spacing: -0.015em;
+}
+
+/* ページシェル：body の背景を見せる（個別の bg-slate-100 を無効化） */
+main.min-h-screen {
+  background-color: transparent !important;
+  min-height: calc(100vh - 3.5rem); /* ナビ分を差し引く */
+}
+
+/* ------------------------------------------------------------
+   カードの格上げ：rounded-2xl/xl × shadow-sm の組み合わせを上質に
+   （既存ページのクラスをそのまま引き上げる）
+   ------------------------------------------------------------ */
+.bg-white.rounded-2xl.shadow-sm,
+.bg-white.rounded-xl.shadow-sm {
+  border: 1px solid var(--line);
+  box-shadow:
+    0 1px 2px rgba(11, 18, 33, 0.04),
+    0 18px 36px -22px rgba(11, 18, 33, 0.22);
+}
+
+/* 入力系の質感 */
+input,
+select,
+textarea {
+  background: #fff;
+  border-color: var(--line);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--positive) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* 選択色 */
+::selection {
+  background: color-mix(in srgb, var(--positive) 22%, transparent);
+}
+
+/* スクロールバー（控えめ） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar { height: 8px; width: 8px; }
+*::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ナビの横スクロールバーを隠す */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* モーション配慮 */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

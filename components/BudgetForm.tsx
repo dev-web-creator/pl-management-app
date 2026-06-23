@@ -7,14 +7,17 @@ export default function BudgetForm({
   period,
   initialIncome,
   initialExpense,
+  initialTotalAssets,
 }: {
   period: string; // 'YYYY-MM-01'
   initialIncome: number;
   initialExpense: number;
+  initialTotalAssets: number;
 }) {
   const router = useRouter();
   const [income, setIncome] = useState(initialIncome ? String(initialIncome) : "");
   const [expense, setExpense] = useState(initialExpense ? String(initialExpense) : "");
+  const [assets, setAssets] = useState(initialTotalAssets ? String(initialTotalAssets) : "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export default function BudgetForm({
           period,
           income: parseInt(income, 10) || 0,
           expense: parseInt(expense, 10) || 0,
+          total_assets: parseInt(assets, 10) || 0,
         }),
       });
       const d = await res.json();
@@ -67,6 +71,17 @@ export default function BudgetForm({
             placeholder="¥0"
             className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
           />
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs text-slate-500">総資産の目標（資産形成・任意）</label>
+          <input
+            inputMode="numeric"
+            value={assets}
+            onChange={(e) => setAssets(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="¥0"
+            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
+          />
+          <p className="text-[10px] text-slate-400 mt-1">資産ダッシュボード(/assets)で達成率を表示します。</p>
         </div>
       </div>
       <button

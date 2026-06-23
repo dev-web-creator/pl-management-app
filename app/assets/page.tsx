@@ -4,12 +4,14 @@ import {
   getAssetTrend,
   getAssetBreakdown,
   getDividendTrend,
+  getAssetTarget,
 } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 const yen = (n: number) => "¥" + n.toLocaleString("ja-JP");
 const man = (n: number) => (n / 10000).toFixed(0) + "万";
+const pad = (n: number) => String(n).padStart(2, "0");
 
 const TYPE_LABEL: Record<string, string> = {
   bank: "銀行",
@@ -19,12 +21,16 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default async function AssetsPage() {
-  const [assets, trend, breakdown, dividends] = await Promise.all([
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+  const [assets, trend, breakdown, dividends, assetTarget] = await Promise.all([
     getAssets(),
     getAssetTrend(),
     getAssetBreakdown(),
     getDividendTrend(),
+    getAssetTarget(thisMonth),
   ]);
+  const achievePct = assetTarget > 0 ? Math.round((assets.total_assets / assetTarget) * 100) : null;
 
   const maxAsset = Math.max(1, ...trend.map((t) => t.total_assets));
   const breakdownTotal = breakdown.reduce((s, b) => s + b.total, 0) || 1;
@@ -53,6 +59,39 @@ export default async function AssetsPage() {
           <Stat label="総資産" value={assets.total_assets} />
           <Stat label="カード未払い" value={assets.card_unpaid} negative />
           <Stat label="純資産" value={assets.net_assets} accent />
+        </section>
+
+        {/* 資産形成の目標達成率 */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-semibold text-slate-500">資産形成の目標（今月）</h2>
+            <Link href={`/budget?m=${thisMonth}`} className="text-[11px] text-sky-600 hover:underline">
+              目標を設定 ›
+            </Link>
+          </div>
+          {assetTarget > 0 ? (
+            <>
+              <div className="flex items-baseline justify-between text-sm mb-2">
+                <span className="text-slate-500">
+                  現在 <span className="font-bold text-slate-900 tabular-nums">{yen(assets.total_assets)}</span>
+                  <span className="text-slate-400"> / 目標 {yen(assetTarget)}</span>
+                </span>
+                <span className={"font-bold tabular-nums " + ((achievePct ?? 0) >= 100 ? "text-emerald-600" : "text-slate-700")}>
+                  達成率 {achievePct}%
+                </span>
+              </div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={(achievePct ?? 0) >= 100 ? "h-full bg-emerald-500" : "h-full bg-sky-400"}
+                  style={{ width: `${Math.min(achievePct ?? 0, 100)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-400">
+              目標が未設定です。「目標を設定 ›」から総資産の目標額を入れると達成率が出ます。
+            </p>
+          )}
         </section>
 
         {/* 総資産の推移 */}

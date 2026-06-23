@@ -87,7 +87,12 @@ export default async function BudgetPage({
           </table>
         </section>
 
-        <BudgetForm period={period} initialIncome={b.target_income} initialExpense={b.target_expense} />
+        <BudgetForm
+          period={period}
+          initialIncome={b.target_income}
+          initialExpense={b.target_expense}
+          initialTotalAssets={b.target_total_assets}
+        />
 
         <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm p-4">
           <div className="text-xs text-slate-500">

@@ -5,7 +5,7 @@ const USER_ID = 1;
 
 // 月次の目標（収入・支出）を保存。収支(net_balance)は income-expense で自動保存。
 export async function POST(req: Request) {
-  let b: { period?: string; income?: number; expense?: number };
+  let b: { period?: string; income?: number; expense?: number; total_assets?: number };
   try {
     b = await req.json();
   } catch {
@@ -21,6 +21,10 @@ export async function POST(req: Request) {
     ["expense", expense],
     ["net_balance", income - expense],
   ];
+  // 総資産目標は任意（指定時のみ保存）
+  if (b.total_assets !== undefined && b.total_assets !== null) {
+    entries.push(["total_assets", Number(b.total_assets) || 0]);
+  }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");

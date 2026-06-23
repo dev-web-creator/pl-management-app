@@ -220,10 +220,20 @@ export async function getCardLegs(): Promise<CardLeg[]> {
 export type BudgetVsActual = {
   target_income: number;
   target_expense: number;
+  target_total_assets: number;
   actual_income: number;
   actual_expense: number;
   closed: boolean; // 月の確定（黒塗り）
 };
+
+// 指定月の総資産目標（無ければ0）。
+export async function getAssetTarget(period: string): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT amount FROM targets WHERE user_id=$1 AND period=$2 AND metric='total_assets'`,
+    [USER_ID, period]
+  );
+  return rows[0]?.amount ?? 0;
+}
 
 export async function getBudgetVsActual(period: string): Promise<BudgetVsActual> {
   const t = await pool.query(`SELECT metric, amount FROM targets WHERE user_id=$1 AND period=$2`, [
@@ -255,6 +265,7 @@ export async function getBudgetVsActual(period: string): Promise<BudgetVsActual>
   return {
     target_income: tg["income"] ?? 0,
     target_expense: tg["expense"] ?? 0,
+    target_total_assets: tg["total_assets"] ?? 0,
     actual_income: a.rows[0].inc,
     actual_expense: a.rows[0].exp,
     closed: c.rows[0].closed_n >= 3,

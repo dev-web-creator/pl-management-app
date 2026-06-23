@@ -236,21 +236,46 @@ export default async function Home({
           </div>
         </section>
 
-        {/* 変動費グループ */}
+        {/* 変動費グループ＋カテゴリ別比率グラフ */}
         <section className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-sm font-semibold text-slate-500 mb-3">
             変動費 内訳（グループ／自動集計）
           </h2>
-          <div className="space-y-2">
-            {varGroups.map((g) => (
-              <div key={g.id} className="flex justify-between text-sm">
-                <span>{g.name}</span>
-                <span className="tabular-nums font-semibold text-amber-600">
-                  {yen(g.total)}
-                </span>
-              </div>
-            ))}
-          </div>
+          {(() => {
+            const palette = ["#f59e0b", "#6366f1", "#10b981", "#0ea5e9", "#ef4444", "#94a3b8"];
+            const varTotal = varGroups.reduce((s, g) => s + g.total, 0);
+            return (
+              <>
+                {varTotal > 0 && (
+                  <div className="flex h-5 rounded-full overflow-hidden mb-3">
+                    {varGroups.map((g, i) =>
+                      g.total > 0 ? (
+                        <div
+                          key={g.id}
+                          style={{ width: `${(g.total / varTotal) * 100}%`, background: palette[i % palette.length] }}
+                          title={`${g.name} ${yen(g.total)}`}
+                        />
+                      ) : null
+                    )}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {varGroups.map((g, i) => (
+                    <div key={g.id} className="flex justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-sm" style={{ background: palette[i % palette.length] }} />
+                        {g.name}
+                        {varTotal > 0 && (
+                          <span className="text-[10px] text-slate-400">{Math.round((g.total / varTotal) * 100)}%</span>
+                        )}
+                      </span>
+                      <span className="tabular-nums font-semibold text-amber-600">{yen(g.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </section>
 
         {/* ウォレット残高 */}

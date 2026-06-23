@@ -225,6 +225,22 @@ export async function getFiscalYearPL(startPeriod: string): Promise<FyMonthPL[]>
   return rows.map((r) => ({ ...r, surplus: r.income - r.fixed - r.variable }));
 }
 
+export type FyTotal = { income: number; fixed: number; variable: number; surplus: number };
+
+// FY（開始月初日から12ヶ月）の年計のみを取得（複数FY比較用・軽量）。
+export async function getFiscalYearTotal(startPeriod: string): Promise<FyTotal> {
+  const { rows } = await pool.query(
+    `SELECT COALESCE(SUM(amount) FILTER (WHERE type='income'  AND pl_type='income'),0)::int        AS income,
+            COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type='fixed_cost'),0)::int    AS fixed,
+            COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type='variable_cost'),0)::int AS variable
+     FROM transactions t JOIN categories c ON c.id=t.category_id
+     WHERE t.user_id=$1 AND t.accrual_date >= $2::date AND t.accrual_date < ($2::date + interval '12 months')`,
+    [USER_ID, startPeriod]
+  );
+  const r = rows[0];
+  return { ...r, surplus: r.income - r.fixed - r.variable };
+}
+
 // ---- クレカ請求サイクル（ADR-023） ----
 export type CardLeg = {
   card_id: number;

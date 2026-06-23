@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getUserFyStartMonth, getFiscalYearPL } from "@/lib/queries";
+import { getUserFyStartMonth, getFiscalYearPL, getFiscalYearTotal } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,13 @@ export default async function YearPage({
   const fyLabel = `FY${sy}（${sy}年${sm}月〜${ey}年${em}月）`;
 
   const rows = await getFiscalYearPL(start);
+
+  // 複数FY比較（当年度＋過去2年度）
+  const compareStarts = [addMonths(start, -24), addMonths(start, -12), start];
+  const compare = await Promise.all(
+    compareStarts.map(async (s) => ({ start: s, fy: Number(s.split("-")[0]), tot: await getFiscalYearTotal(s) }))
+  );
+  const maxCmp = Math.max(1, ...compare.map((c) => Math.abs(c.tot.surplus)));
   const tot = rows.reduce(
     (a, r) => ({
       income: a.income + r.income,
@@ -119,6 +126,32 @@ export default async function YearPage({
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* 複数FY比較 */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-500 mb-3">FY比較（直近3年度）</h2>
+          <div className="space-y-2">
+            {compare.map((c) => (
+              <div key={c.start} className="text-sm">
+                <div className="flex justify-between mb-0.5">
+                  <span className="font-medium tabular-nums">FY{c.fy}</span>
+                  <span className="tabular-nums text-slate-500">
+                    収入 {yen(c.tot.income)} ・ 支出 {yen(c.tot.fixed + c.tot.variable)} ・
+                    <span className={c.tot.surplus < 0 ? "text-red-500 font-semibold" : "text-emerald-600 font-semibold"}>
+                      {" "}黒字 {yen(c.tot.surplus)}
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={(c.tot.surplus < 0 ? "bg-red-400" : "bg-emerald-400") + " h-full"}
+                    style={{ width: `${(Math.abs(c.tot.surplus) / maxCmp) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 

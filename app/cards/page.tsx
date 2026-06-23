@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getCardLegs, type CardLeg } from "@/lib/queries";
+import { getCardLegs, getCardSettlements, type CardLeg } from "@/lib/queries";
+import SettleCardButton from "@/components/SettleCardButton";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,8 @@ function cycleOf(dateStr: string, c: CardLeg): Cycle {
 }
 
 export default async function CardsPage() {
-  const legs = await getCardLegs();
+  const [legs, settlements] = await Promise.all([getCardLegs(), getCardSettlements()]);
+  const settledKeys = new Set(settlements.map((s) => `${s.card_id}:${s.close_key}`));
   const now = new Date();
   const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
@@ -86,8 +88,11 @@ export default async function CardsPage() {
                 <div className="space-y-3">
                   {sorted.map(([key, v]) => {
                     const isUpcoming = upcoming && v === upcoming;
+                    const closeKey = `${v.cyc.closeY}-${pad(v.cyc.closeM)}-${pad(v.cyc.closeD)}`;
+                    const payDate = `${v.cyc.payY}-${pad(v.cyc.payM)}-${pad(v.cyc.payD)}`;
+                    const settled = settledKeys.has(`${info.card_id}:${closeKey}`);
                     return (
-                      <div key={key} className={"border rounded-xl p-3 " + (isUpcoming ? "border-sky-300 bg-sky-50/40" : "")}>
+                      <div key={key} className={"border rounded-xl p-3 " + (settled ? "opacity-60" : isUpcoming ? "border-sky-300 bg-sky-50/40" : "")}>
                         <div className="flex items-center justify-between">
                           <div className="text-sm">
                             <span className="font-semibold tabular-nums">
@@ -97,9 +102,18 @@ export default async function CardsPage() {
                             <span className="tabular-nums">
                               {v.cyc.payM}/{v.cyc.payD} 引落
                             </span>
-                            {isUpcoming && <span className="text-[10px] bg-sky-500 text-white px-1.5 py-0.5 rounded ml-2">次回引落</span>}
+                            {settled ? (
+                              <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded ml-2">消込済み</span>
+                            ) : isUpcoming ? (
+                              <span className="text-[10px] bg-sky-500 text-white px-1.5 py-0.5 rounded ml-2">次回引落</span>
+                            ) : null}
                           </div>
-                          <span className="font-bold tabular-nums">{yen(v.total)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold tabular-nums">{yen(v.total)}</span>
+                            {!settled && (
+                              <SettleCardButton cardId={info.card_id} closeKey={closeKey} amount={v.total} payDate={payDate} />
+                            )}
+                          </div>
                         </div>
                         <div className="mt-2 space-y-0.5">
                           {v.items.map((it) => (

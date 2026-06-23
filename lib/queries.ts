@@ -236,6 +236,21 @@ export type CardLeg = {
   memo: string | null;
 };
 
+// クレカ消込済みの締めサイクル（memoに 'クレカ消込:YYYY-MM-DD締め' を埋めている）。
+export async function getCardSettlements(): Promise<{ card_id: number; close_key: string }[]> {
+  const { rows } = await pool.query(
+    `SELECT to_wallet_id AS card_id, memo FROM transfers
+     WHERE user_id=$1 AND kind='card_settlement' AND memo LIKE 'クレカ消込:%締め'`,
+    [USER_ID]
+  );
+  return rows
+    .map((r) => {
+      const m = (r.memo as string).match(/クレカ消込:(\d{4}-\d{2}-\d{2})締め/);
+      return m ? { card_id: r.card_id as number, close_key: m[1] } : null;
+    })
+    .filter((x): x is { card_id: number; close_key: string } => x !== null);
+}
+
 // クレカで支払った取引脚（カード設定つき）。請求サイクルの判定はアプリ側で行う（ADR-023）。
 export async function getCardLegs(): Promise<CardLeg[]> {
   const { rows } = await pool.query(

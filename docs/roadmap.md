@@ -12,7 +12,7 @@
 - ✅ 取引入力（`AddTransactionForm`＋`POST /api/transactions`）：支出/収入の**単一脚**、脚合計の検証、原子的INSERT
 - ✅ DBインスペクター（`/inspect`）：全テーブル閲覧（学習用）
 - ✅ 本番デプロイ：GitHub(private)→Vercel→Neon。PC/スマホから利用可
-- ✅ ドキュメント：要件/マスタ/ER設計/how-it-works/ADR-001〜030/各デプロイ手順
+- ✅ ドキュメント：要件/マスタ/ER設計/how-it-works/ADR-001〜031/デプロイ手順（Vercel+Neon）
 
 ## 🚧 着手中・直近の宿題
 - 🚧 **サイト保護**（ADR-029）：Basic認証を入れたが Vercel で全ルート500 → 一旦撤去。**安全な方式で再導入が必要**（/inspect は認証の内側で残す方針）。
@@ -45,7 +45,7 @@
 - 🚧 給与明細OCR：Gemini無料枠で実装方針（要 GEMINI_API_KEY＝Google AI Studioの無料キー）。キー入手後に実装予定。
 - ✅ Phase 3 残：画面遷移図・API一覧の文書化（`docs/screens-and-api.md`）
 - ✅ ダッシュボードにカテゴリ別比率グラフ（変動費グループの構成比バー＋%）を追加（要件のBIビュー項目）
-- ⬜ AWS版プロビジョニング（ADR-028・課金同意とアカウント待ち）
+- ❌ AWS版プロビジョニング：不採用（Vercel+Neonで安定稼働中のため成果物を撤去・ADR-031。必要になればgit履歴から復元可）
 
 ## 今やること（直近の順番）
 1. ✅ 取引一覧＋削除（P1）

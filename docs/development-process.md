@@ -8,11 +8,11 @@
 | Phase | 名称 | 目的 | 成果物 | 状態 |
 |-------|------|------|--------|------|
 | 0 | 要件のたたき台 | コンセプト・要件の言語化 | `docs/requirements.md` | ✅ 完了 |
-| 1 | **UI/UXモックアップ** | 画面と操作感の確認（捨てやすいHTML） | `mockup/index.html` | ✅ 完了 |
+| 1 | **UI/UXモックアップ** | 画面と操作感の確認（捨てやすいHTML） | `mockup/index.html`（役目を終え削除済み・git履歴に有） | ✅ 完了 |
 | 2 | 現運用のすり合わせ | ユーザーの実運用詳細を反映し要件更新 | requirements.md 更新 / `docs/master-data.md` / ADR-001〜027 | ✅ 完了 |
 | 3 | 基本設計 | 確定したER図・画面遷移・API一覧 | `docs/database-design.md` 他 | 🚧 ER完了。画面遷移/API一覧が残 |
 | 4 | 実装（DB→API→UI） | ローカルPostgreSQL + Next.js | アプリ本体 | 🚧 DB稼働＋Next.js接続✅・入力UI✅。固定費の予実（ADR-030）実装中 |
-| 5 | AWS移行・本番化 | RDS等へのデプロイ | `Dockerfile` / `docs/aws-deployment.md` | ✅ **Vercel + Neon に本番デプロイ済み（稼働中）**。AWS版は成果物準備済・課金同意待ち |
+| 5 | 本番化 | クラウドへのデプロイ | `docs/deploy-vercel.md` | ✅ **Vercel + Neon に本番デプロイ済み（稼働中）**。AWS案は不採用として成果物（Dockerfile等）を撤去（ADR-031。git履歴に有） |
 
 > 詳細設計（クラス設計レベル）は Phase 3 の基本設計に内包し、独立フェーズにはしない方針。
 
@@ -28,14 +28,7 @@
 
 ## 現在地
 
-- Phase 0〜3 完了（要件・現運用すり合わせ・基本設計＝ER＋カラム定義）。ADRは001〜027。
-- Phase 4 実装：**ローカルPostgreSQL（C:\pgsql / 17.5）起動済み、`pl_app` に schema/seed 投入完了**（2026-06-06 検証：テーブル13・wallets18・categories49・recurring_rules10）。日本語パス問題はポータブル版で解消済み。
-- Next.js 接続済み：`lib/queries.ts`＋`app/page.tsx`（サーバーコンポーネント）で `http://localhost:3000` に実データのPLダッシュボードを表示。集計はすべてSQL（残高カラム無し）。
-- **本番**: Vercel + Neon にデプロイ済み（https://pl-management-app.vercel.app/ で稼働中）。ローカルPostgreSQL(C:\pgsql)は「ローカル開発時だけ」起動すればよく、本番(Neon)には無関係。
-- **次の一手**（2026-06-20 着手）：
-  1. ✅ 取引入力UI（支出/収入の単一脚）。
-  2. 🚧 **致命的修正**：サイト全体をBasic認証で保護（ADR-029。/inspect は残す）＋ 対象月のハードコード解消（動的な「今月」＋月送り）。
-  3. 🚧 **固定費の予実**（ADR-030）：recurring_rules を予定額として月次に自動表示し、実績と突合。
-  4. `db/seed.sql` の固定費の金額・引落カード（🔶仮置き）を実値に差し替え。
-  5. Phase 3 残り：画面遷移・API一覧の基本設計。
-- セッション移行する場合は **`docs/handoff.md`** に起動・再投入手順あり。
+- **できている・いないの棚卸しは `docs/roadmap.md` が単一の真実（source of truth）。**
+- **本番**: Vercel + Neon にデプロイ済み・稼働中（`docs/deploy-vercel.md`）。
+- **ローカル開発**: ポータブルPostgreSQL（C:\pgsql / 17.5）。起動・schema/seed再投入の手順は `db/README.md`。
+  ローカルDBは開発時だけ起動すればよく、本番(Neon)には無関係。

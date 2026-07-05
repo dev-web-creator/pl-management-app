@@ -225,6 +225,17 @@
 - **影響範囲**: `lib/queries.ts`（`getFixedCostPlanVsActual`）、`app/page.tsx`（固定費の予実セクション・PL固定費ラインの算出）。ADR-020 を具体化。
 - **状態**: 有効（まず表示まで。各行からの「実額で記録」操作は次段）。
 
+## ADR-031 | 2026-07-05 | 検討終了物の撤去（AWS成果物・Docker・モックアップ・旧引き継ぎメモ）
+- **決定**: リポジトリのノイズ削減のため、検討が終わり現運用で使っていない成果物を削除（すべてgit履歴に残る）。
+  - **AWS移行の成果物**: `Dockerfile` / `.dockerignore` / `docs/aws-deployment.md`。本番は Vercel + Neon で稼働中のため AWS案（ADR-028）は不採用として撤去。ADR-028 はこれにより**更新済**（履歴として残す）。`next.config.ts` の `output:'standalone'` は Vercel でも無害なため現状維持（本番構成に触れない）。
+  - **Dockerローカル環境**: `docker-compose.yml` / `docs/local-setup.md` / `db/run.ps1`。実際のローカル開発はポータブルPostgreSQL（C:\pgsql / trust認証）で確定しており（`.env.local` も `postgres@localhost`）、Docker経路は不使用。手順は `db/README.md` に集約。
+  - **Phase 1 モックアップ**: `mockup/index.html` / ルート `index.html`（モックへのリダイレクト）。役目終了。
+  - **旧引き継ぎメモ**: `docs/handoff.md`。2026-06-06時点のスナップショットで内容が陳腐化。進捗の単一の真実は `docs/roadmap.md`、DB起動手順は `db/README.md` へ移管。
+  - **デモデータ**: `db/dev/demo_seed.sql`。本番で実データ運用中のため体感用デモは不要。`db/dev/queries.sql`（学習用クエリ集）は残す。
+- **理由**: 実装に不要になった検討資料が実運用のドキュメントと混在し、どれが「正」か分かりにくくなっていたため。稼働中のアプリのコード・設定（app/ components/ lib/ db/schema・seed、next.config.ts）には一切手を入れない。
+- **影響範囲**: docs/ ・ルート直下・db/ のファイル構成。`docs/development-process.md` と `db/README.md` の参照を更新。
+- **状態**: 有効
+
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
 

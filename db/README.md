@@ -3,59 +3,51 @@
 このディレクトリのSQL：
 - `schema.sql` … テーブル定義（DDL）。13テーブル＋トリガ。
 - `seed.sql` … 初期データ（ウォレット・カテゴリ・固定費マスタ等）。`schema.sql`の後に実行。
+- `dev/queries.sql` … 集計クエリ集（学習用。`lib/queries.ts` と同内容）。
 
 設計の根拠は `../docs/database-design.md` と `../docs/decisions.md`（ADR）を参照。
+本番は Neon（`docs/deploy-vercel.md`）。以下はローカル開発環境の手順。
 
 ---
 
-## 方法A：Docker で立ち上げる（おすすめ・最短）
+## ローカル環境：ポータブルPostgreSQL（確定構成）
 
-[Docker Desktop](https://www.docker.com/products/docker-desktop/) を入れて、プロジェクト直下で：
+GUIインストーラ（EDB）は日本語ユーザー名で失敗するため、ポータブル版 PostgreSQL **17.5** を
+`C:\pgsql`（ASCIIパス）に展開して使う（trust認証＝パスワード不要）。データ領域は `C:\pgsql\data`、DB名 `pl_app`。
 
-```bash
-docker compose up -d
+### サーバ起動／停止
+
+```powershell
+# 起動（停止していたら）
+C:\pgsql\bin\pg_ctl.exe -D C:\pgsql\data -l C:\pgsql\log.txt start
+
+# 接続確認
+(Test-NetConnection localhost -Port 5432).TcpTestSucceeded   # → True
+
+# 停止
+C:\pgsql\bin\pg_ctl.exe -D C:\pgsql\data stop
 ```
 
-初回起動で `schema.sql` → `seed.sql` が**自動実行**されます。中身を確認：
+### schema/seed の投入（作り直し時）
 
-```bash
-# テーブル一覧
-docker exec -it pl_app_db psql -U pl -d pl_app -c "\dt"
+```powershell
+$env:PGCLIENTENCODING='UTF8'
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -v ON_ERROR_STOP=1 -f db\schema.sql
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -v ON_ERROR_STOP=1 -f db\seed.sql
 
-# カテゴリのツリーが入ったか
-docker exec -it pl_app_db psql -U pl -d pl_app -c "SELECT name, pl_type, is_input_allowed FROM categories ORDER BY display_order;"
-
-# ウォレット
-docker exec -it pl_app_db psql -U pl -d pl_app -c "SELECT name, type, branch FROM wallets ORDER BY display_order;"
+# 確認
+C:\pgsql\bin\psql.exe -U postgres -h localhost -d pl_app -c "\dt"
 ```
 
-作り直したいとき：
+**成功判定**: テーブル13個、wallets≈18 / categories≈49 / recurring_rules=10 件。
 
-```bash
-docker compose down -v   # データ削除
-docker compose up -d     # schema/seed を再実行
-```
-
----
-
-## 方法B：PostgreSQL を直接インストール
-
-Windows は [PostgreSQL公式インストーラ](https://www.postgresql.org/download/windows/) を導入後：
-
-```bash
-# DB作成
-createdb pl_app
-
-# スキーマ→初期データ
-psql -d pl_app -f db/schema.sql
-psql -d pl_app -f db/seed.sql
-```
+アプリの接続設定は `.env.local` の `DATABASE_URL=postgresql://postgres@localhost:5432/pl_app`。
+起動は プロジェクト直下で `npm run dev`（要 DBサーバ起動済み）。
 
 ---
 
 ## 動作確認クエリ（残高が「取引から算出」される例）
 
-将来、取引(transactions/transaction_legs)や振替(transfers)を入れた後、
 各ウォレットの現在残高はこのように**集計で**算出します（残高カラムは持たない / ADR-002）。
 
 ```sql
@@ -71,5 +63,5 @@ LEFT JOIN transactions t ON t.id = l.transaction_id
 WHERE w.user_id = (SELECT id FROM users WHERE email='owner@example.com')
 GROUP BY w.id, w.name, w.initial_balance
 ORDER BY w.name;
--- ※ transfers(振替)の加減算は別途UNIONで合算。実装時にビュー化する。
+-- ※ transfers(振替)の加減算は別途UNIONで合算。実装はビュー/lib/queries.ts参照。
 ```

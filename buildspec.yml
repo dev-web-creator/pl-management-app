@@ -1,0 +1,15 @@
+# AWS CodeBuild でDockerイメージをビルドしECRへプッシュ（ADR-038）
+# ローカルにDocker不要（会社PCのDocker Desktopライセンス問題を回避）。
+# 環境変数 ECR_URI はCodeBuildプロジェクト側で設定。privilegedMode=true が必要。
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_URI
+  build:
+    commands:
+      - docker build -t $ECR_URI:latest .
+  post_build:
+    commands:
+      - docker push $ECR_URI:latest

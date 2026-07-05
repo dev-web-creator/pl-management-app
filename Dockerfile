@@ -33,4 +33,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 # standalone 出力のエントリポイント
-CMD ["node", "server.js"]
+# App Runner は実行時に HOSTNAME をコンテナ名で上書きするため、
+# 起動コマンド側で 0.0.0.0 バインドを強制する（でないとヘルスチェック不通）
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node server.js"]

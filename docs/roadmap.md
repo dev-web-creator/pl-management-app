@@ -12,17 +12,17 @@
 - ✅ 取引入力（`AddTransactionForm`＋`POST /api/transactions`）：支出/収入の**単一脚**、脚合計の検証、原子的INSERT
 - ✅ DBインスペクター（`/inspect`）：全テーブル閲覧（学習用）
 - ✅ 本番デプロイ：GitHub(private)→Vercel→Neon。PC/スマホから利用可
-- ✅ ドキュメント：要件/マスタ/ER設計/how-it-works/ADR-001〜031/デプロイ手順（Vercel+Neon）
+- ✅ ドキュメント：要件/マスタ/ER設計/how-it-works/ADR-001〜032/デプロイ手順（Vercel+Neon）
+- ✅ デザイン刷新：sumika（BSD-3）の「Warm Kakeibo」テーマ移植＋ログイン/ログアウト（ADR-032）
 
 ## 🚧 着手中・直近の宿題
-- 🚧 **サイト保護**（ADR-029）：Basic認証を入れたが Vercel で全ルート500 → 一旦撤去。**安全な方式で再導入が必要**（/inspect は認証の内側で残す方針）。
-- 🚧 固定費の予実（ADR-030）：表示は完了。各行からの**「実額で記録」ワンタップ**操作が残り。
+- 🚧 **本番の認証有効化**：ログイン実装済み（ADR-032）。Vercel に `AUTH_USER` / `AUTH_PASSWORD` / `AUTH_SECRET` を設定すると有効化される（未設定の間は誰でも閲覧可のまま）。
 
 ## ⬜ バックログ（優先度順）
 
 ### P1（実データを入れる前に必要）
 - ✅ **/inspect の保護**（ルート単位ガード・本番は `INSPECT_KEY`＋`?key=` 必須／ローカルは開放／全体middlewareは不使用で500回避）。
-- ⬜ **サイト全体の認証**（ADR-029）：ダッシュボード等もまだ公開。Vercel Previewで検証した安定middlewareで。実データ投入前に。
+- ✅ **サイト全体の認証**（ADR-029→032）：セッションCookie方式のログイン/ログアウト（middleware不使用で500回避）。全ページ・全APIをガード。env 3つで有効化。
 - ✅ **取引一覧ビュー**（`/transactions`・月切替・**削除**・**編集**）：一覧＋`DELETE`＋`PUT /api/transactions/[id]`＋`/transactions/[id]/edit`（フォーム流用）。分割払いは編集で単一脚に集約。
 - ✅ 固定費「実額で記録」ワンタップ（ADR-030次段）：`POST /api/recurring/post`＋`RecordFixedCostButton`。予定行から1タップで当月の実額取引化（重複ガードあり）。
 - ✅ **固定費マスタ管理UI**（`/fixed-costs`）：アプリ内で追加/編集/解約(終了年月)/削除。`/api/recurring`(POST)・`/api/recurring/[id]`(PUT/DELETE)・`RecurringForm`。→ **実値はユーザーがUIから直接入力可**（seedの🔶仮置きはUIで上書きしていく方針）。

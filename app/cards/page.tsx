@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCardLegs, getCardSettlements, type CardLeg } from "@/lib/queries";
 import SettleCardButton from "@/components/SettleCardButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ function cycleOf(dateStr: string, c: CardLeg): Cycle {
 }
 
 export default async function CardsPage() {
+  await requireAuth();
   const [legs, settlements] = await Promise.all([getCardLegs(), getCardSettlements()]);
   const settledKeys = new Set(settlements.map((s) => `${s.card_id}:${s.close_key}`));
   const now = new Date();

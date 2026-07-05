@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getBudgetVsActual } from "@/lib/queries";
 import BudgetForm from "@/components/BudgetForm";
 import ConfirmMonthButton from "@/components/ConfirmMonthButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function BudgetPage({
 }: {
   searchParams: Promise<{ m?: string }>;
 }) {
+  await requireAuth();
   const sp = await searchParams;
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;

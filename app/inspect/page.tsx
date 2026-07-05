@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listTables, getTableDump } from "@/lib/queries";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic"; // 毎回DBの最新を見る
 
@@ -36,6 +37,7 @@ export default async function Inspect({
 }: {
   searchParams: Promise<{ key?: string }>;
 }) {
+  await requireAuth();
   // ルート単位の保護（サイト全体のmiddlewareは使わない＝過去の全ルート500を回避）。
   // 本番(production)では INSPECT_KEY 環境変数が必須＋ ?key= 一致で閲覧可。
   // キー未設定の本番は「安全側に倒してロック」。ローカル開発(development)は常に閲覧可。

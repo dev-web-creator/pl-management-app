@@ -10,6 +10,7 @@ import {
 import AddTransactionForm from "@/components/AddTransactionForm";
 import RecordFixedCostButton from "@/components/RecordFixedCostButton";
 import Link from "next/link";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic"; // 毎回DBから最新を取得（キャッシュしない）
 
@@ -41,6 +42,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ m?: string }>;
 }) {
+  await requireAuth();
   const sp = await searchParams;
 
   // 対象月：?m=YYYY-MM-01 があればそれ、無ければサーバーの「今月」
@@ -160,9 +162,9 @@ export default async function Home({
 
           {/* 損益の内訳（帳簿） */}
           <div className="mt-5 border-t border-[var(--line)] pt-4 space-y-2.5">
-            <LedgerRow label="可処分所得" sub="手取り・トップライン" value={pl.disposable} color="#0ea5e9" />
-            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#6366f1" />
-            <LedgerRow label="変動費" value={-pl.variable} color="#f59e0b" />
+            <LedgerRow label="可処分所得" sub="手取り・トップライン" value={pl.disposable} color="#3f9d76" />
+            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#ff8a7a" />
+            <LedgerRow label="変動費" value={-pl.variable} color="#e2724f" />
           </div>
           <p className="mt-3 text-[11px] text-[var(--muted)]">
             （PL対象外）経費精算など {yen(pl.excluded)} は残高に反映し、損益には含めません。
@@ -172,9 +174,18 @@ export default async function Home({
         {/* 資産サマリ（タップで資産ダッシュボードへ） */}
         <Link href="/assets" className="block">
           <section className="grid grid-cols-3 gap-3">
-            <Stat label="総資産" value={assets.total_assets} />
-            <Stat label="カード未払い" value={assets.card_unpaid} negative />
-            <Stat label="純資産 ›" value={assets.net_assets} accent />
+            <div className="summary-card income">
+              <span className="summary-label">総資産</span>
+              <span className="summary-value">{yen(assets.total_assets)}</span>
+            </div>
+            <div className="summary-card expense">
+              <span className="summary-label">カード未払い</span>
+              <span className="summary-value">−{yen(assets.card_unpaid)}</span>
+            </div>
+            <div className="summary-card net">
+              <span className="summary-label">純資産 ›</span>
+              <span className="summary-value">{yen(assets.net_assets)}</span>
+            </div>
           </section>
         </Link>
 
@@ -245,7 +256,7 @@ export default async function Home({
             変動費 内訳（グループ／自動集計）
           </h2>
           {(() => {
-            const palette = ["#f59e0b", "#6366f1", "#10b981", "#0ea5e9", "#ef4444", "#94a3b8"];
+            const palette = ["#ff8a7a", "#f5b642", "#3f9d76", "#7bb8e8", "#e2724f", "#c9b8a8"];
             const varTotal = varGroups.reduce((s, g) => s + g.total, 0);
             return (
               <>
@@ -342,33 +353,6 @@ function LedgerRow({
         {value < 0 ? "−" : ""}
         {yen(Math.abs(value))}
       </span>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  negative,
-  accent,
-}: {
-  label: string;
-  value: number;
-  negative?: boolean;
-  accent?: boolean;
-}) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm p-4">
-      <div className="text-[10px] font-semibold tracking-wider uppercase text-[var(--muted)]">{label}</div>
-      <div
-        className={
-          "mt-1 text-lg font-extrabold tabular-nums " +
-          (negative ? "text-[var(--negative)]" : accent ? "text-[var(--positive)]" : "text-[var(--ink)]")
-        }
-      >
-        {negative ? "−" : ""}
-        {yen(value)}
-      </div>
     </div>
   );
 }

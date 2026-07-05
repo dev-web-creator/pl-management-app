@@ -21,6 +21,7 @@ flowchart TD
   D --> YR["/year FY年次・FY比較"]
   D --> VS["/vision ビジョン/目標"]
   D --> IN["/inspect DBインスペクター(保護)"]
+  LG["/login ログイン"] -.認証時のみ.-> D
 ```
 
 ## 画面（ルート）一覧
@@ -42,6 +43,7 @@ flowchart TD
 | `/year` | FY年次ビュー | 年間PL・月次内訳・黒字推移・FY比較 |
 | `/vision` | ビジョン/目標 | 自由記述の箱 |
 | `/inspect` | DBインスペクター | 全テーブル閲覧（本番は `INSPECT_KEY` ＋ `?key=`） |
+| `/login` | ログイン（ADR-032） | ユーザー名/パスワード入力→セッションCookie発行。認証無効時は `/` へ |
 
 ## API エンドポイント一覧
 
@@ -64,8 +66,13 @@ flowchart TD
 | `POST /api/snapshots` | 実残高スナップショットをupsert |
 | `POST /api/cards/settle` | クレカ請求サイクルの引き落とし消込 |
 | `POST /api/vision` | ビジョン/目標の自由記述をupsert |
+| `POST /api/auth/login` | ログイン（成功でセッションCookie＋`/`へ303） |
+| `POST /api/auth/logout` | ログアウト（Cookie削除＋`/login`へ303） |
 
 ## 設計メモ
 - データ取得はサーバーコンポーネントから `lib/queries.ts` を直接呼ぶ（読み取り）。書き込みは `app/api/**` のRoute Handler（POST/PUT/DELETE）。
 - 集計はすべてSQL（残高・合計カラムは持たない／ADR-002・026）。
 - 単一ユーザー固定（`USER_ID=1`）。マルチユーザー化は ADR-004（後段）。
+- **認証**（ADR-032）：`AUTH_USER`/`AUTH_PASSWORD`/`AUTH_SECRET` の3env が揃うと有効。
+  全ページは `requireAuth()`（未ログイン→`/login`）、全API（`/api/health` と `/api/auth/*` を除く）は
+  `requireAuthApi()`（401）でガード。middleware/proxy は不使用（Vercel 500 回避・ADR-029）。

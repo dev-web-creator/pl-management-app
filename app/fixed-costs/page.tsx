@@ -6,12 +6,14 @@ import {
 } from "@/lib/queries";
 import RecurringForm from "@/components/RecurringForm";
 import DeleteRecurringButton from "@/components/DeleteRecurringButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const yen = (n: number) => "¥" + n.toLocaleString("ja-JP");
 
 export default async function FixedCostsPage() {
+  await requireAuth();
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 

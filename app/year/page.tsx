@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getUserFyStartMonth, getFiscalYearPL, getFiscalYearTotal } from "@/lib/queries";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function YearPage({
 }: {
   searchParams: Promise<{ start?: string }>;
 }) {
+  await requireAuth();
   const sp = await searchParams;
   const fyStartMonth = await getUserFyStartMonth();
 

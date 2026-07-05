@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getMonthTransfers, getWalletOptions } from "@/lib/queries";
 import AddTransferForm from "@/components/AddTransferForm";
 import DeleteTransferButton from "@/components/DeleteTransferButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function TransfersPage({
 }: {
   searchParams: Promise<{ m?: string }>;
 }) {
+  await requireAuth();
   const sp = await searchParams;
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;

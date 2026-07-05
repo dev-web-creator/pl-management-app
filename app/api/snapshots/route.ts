@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
 // 実残高スナップショットを保存（wallet×基準日でupsert）。
 // body: { as_of_date: 'YYYY-MM-DD', items: [{wallet_id, actual_balance}] }
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: { as_of_date?: string; items?: { wallet_id?: number; actual_balance?: number }[] };
   try {
     b = await req.json();

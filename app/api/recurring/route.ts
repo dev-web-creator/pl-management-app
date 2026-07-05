@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
@@ -12,6 +13,8 @@ function normMonth(v: unknown): string | null {
 
 // 固定費マスタを新規作成
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: {
     name?: string;
     category_id?: number;

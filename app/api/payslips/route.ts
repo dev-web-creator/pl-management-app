@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
@@ -19,6 +20,8 @@ function numOrNull(v: unknown): number | null {
 
 // 給与明細を作成/更新（月ごとに upsert）
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: {
     period?: string;
     total_work_hours?: unknown;

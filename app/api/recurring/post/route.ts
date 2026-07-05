@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1; // MVPは単一ユーザー
 
@@ -7,6 +8,8 @@ const USER_ID = 1; // MVPは単一ユーザー
 // body: { rule_id: number, period: 'YYYY-MM-01', amount?: number }
 // サーバー側でルールを引き、category_id / settlement_wallet_id / 金額を確定（クライアントを信用しない）。
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let body: { rule_id?: number; period?: string; amount?: number };
   try {
     body = await req.json();

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getVisionNote } from "@/lib/queries";
 import VisionForm from "@/components/VisionForm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function VisionPage() {
+  await requireAuth();
   const content = await getVisionNote();
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 px-4 py-6">

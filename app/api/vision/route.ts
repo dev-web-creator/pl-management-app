@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
 // ビジョン/目標の自由記述を保存（1ユーザー1箱でupsert）
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: { content?: string };
   try {
     b = await req.json();

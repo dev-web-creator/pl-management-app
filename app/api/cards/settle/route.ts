@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
@@ -7,6 +8,8 @@ const USER_ID = 1;
 // 銀行(引落先)→カード の transfer(kind=card_settlement) を1件作り、カード未払いを減らす。
 // body: { card_id, close_key:'YYYY-MM-DD', amount, pay_date:'YYYY-MM-DD' }
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: { card_id?: number; close_key?: string; amount?: number; pay_date?: string };
   try {
     b = await req.json();

@@ -6,6 +6,7 @@ import {
   getWalletOptions,
 } from "@/lib/queries";
 import RecurringForm from "@/components/RecurringForm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function EditRecurringPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAuth();
   const { id } = await params;
   const ruleId = Number(id);
   if (!Number.isInteger(ruleId) || ruleId <= 0) notFound();

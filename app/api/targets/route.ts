@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
 // 月次の目標（収入・支出）を保存。収支(net_balance)は income-expense で自動保存。
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: { period?: string; income?: number; expense?: number; total_assets?: number };
   try {
     b = await req.json();

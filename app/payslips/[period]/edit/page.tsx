@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPayslipForEdit } from "@/lib/queries";
 import PayslipForm from "@/components/PayslipForm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export default async function EditPayslipPage({
 }: {
   params: Promise<{ period: string }>;
 }) {
+  await requireAuth();
   const { period } = await params;
   if (!/^\d{4}-\d{2}$/.test(period)) notFound();
 

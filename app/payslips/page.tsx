@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { getPayslips } from "@/lib/queries";
 import DeletePayslipButton from "@/components/DeletePayslipButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const yen = (n: number) => "¥" + n.toLocaleString("ja-JP");
 
 export default async function PayslipsPage() {
+  await requireAuth();
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const rows = await getPayslips();

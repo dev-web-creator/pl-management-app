@@ -236,6 +236,28 @@
 - **影響範囲**: docs/ ・ルート直下・db/ のファイル構成。`docs/development-process.md` と `db/README.md` の参照を更新。
 - **状態**: 有効
 
+## ADR-032 | 2026-07-05 | デザインを sumika の「Warm Kakeibo」テーマに刷新＋セッションログイン導入
+- **決定**:
+  1. **デザイン**: UIテーマを [sumika](https://github.com/horie-t/sumika)（家計簿SaaS・BSD 3-Clause License, Copyright (c) 2026, HORIE Tetsuya）の
+     「Warm Kakeibo」テーマ（コーラル×クリームの温かいパステル・白カード・丸角・絵文字装飾・丸ゴシック）を基に全面刷新。
+     `frontend/src/index.css` 由来のスタイルを `app/globals.css` に移植・改変し、Tailwind の @theme でパレット（slate/emerald/red等）を
+     一括再マップして全ページに適用。フォントは Zen Maru Gothic（Hiragino Maru の意図をクロスプラットフォームで再現）。
+     BSD-3 の条件に従い、著作権表記を `app/globals.css` 冒頭と本ADRに保持する。
+  2. **認証**: ログイン/ログアウトを実装（ADR-029「サイト全体を認証で守る」の実現形）。sumika は Keycloak(OIDC) だが
+     Vercel サーバーレスでは常駐サーバーが持てないため、**HMAC署名付きセッションCookie（httpOnly / 30日）** の軽量実装とした。
+     - 資格情報・鍵は環境変数 `AUTH_USER` / `AUTH_PASSWORD` / `AUTH_SECRET`。**3つ全て設定されたときだけ有効**
+       （未設定なら素通し＝ローカル開発と env 設定前の本番を止めない。ADR-029 と同じ安全設計）。
+     - ガードは **middleware/proxy を使わない**（Next 16 + Vercel で全ルート500の前科・ADR-029）。
+       各ページ先頭で `requireAuth()`（未ログイン→ /login へリダイレクト）、各APIハンドラ先頭で `requireAuthApi()`（401）を呼ぶ方式。
+     - `/api/health` は死活監視用に無認証のまま。`/inspect` は既存の `INSPECT_KEY` ガードに加えログインも必要になる。
+- **理由**: ユーザーがsumikaのデザインと「ログインがある」体験を高く評価し、機能は保ったまま見た目と認証を取り入れたいと要望。
+  ライセンスがBSD-3で合法的に流用可能。認証はKeycloakの本格OIDCでなく、単一ユーザーの現段階に見合う最小実装を選択
+  （将来のマルチユーザー化＝ADR-004 時に NextAuth 等へ置き換え可能）。
+- **影響範囲**: `app/globals.css`（全面）、`app/layout.tsx`（フォント・セッション）、`components/TopNav.tsx`（sumika風ナビ＋ログアウト）、
+  `lib/auth.ts`（新規）、`app/login/page.tsx`・`app/api/auth/login|logout`（新規）、全15ページ＋全14APIルートにガード追加、
+  `app/page.tsx`（サマリーカード・配色）。
+- **状態**: 有効（ADR-029 はこれにより**実現済みに更新**。本番有効化は Vercel の env 3つの設定が必要）
+
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
 

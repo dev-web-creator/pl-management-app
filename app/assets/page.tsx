@@ -6,6 +6,7 @@ import {
   getDividendTrend,
   getAssetTarget,
 } from "@/lib/queries";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default async function AssetsPage() {
+  await requireAuth();
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
   const [assets, trend, breakdown, dividends, assetTarget] = await Promise.all([

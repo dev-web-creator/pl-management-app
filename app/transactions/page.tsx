@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getMonthTransactions } from "@/lib/queries";
 import DeleteTxButton from "@/components/DeleteTxButton";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ m?: string }>;
 }) {
+  await requireAuth();
   const sp = await searchParams;
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;

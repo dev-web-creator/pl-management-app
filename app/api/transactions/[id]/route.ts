@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1; // MVPは単一ユーザー
 
@@ -8,6 +9,8 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   const { id } = await params;
   const txId = Number(id);
   if (!Number.isInteger(txId) || txId <= 0) {
@@ -28,6 +31,8 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   const { id } = await params;
   const txId = Number(id);
   if (!Number.isInteger(txId) || txId <= 0) {

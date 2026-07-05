@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 const SECTIONS = ["income", "fixed_cost", "variable_cost"];
 
 // 月の確定（黒塗り）を切り替え。closed=true で当月の主要セクションを確定。
 export async function POST(req: Request) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   let b: { period?: string; closed?: boolean };
   try {
     b = await req.json();

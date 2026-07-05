@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { getReconcileData } from "@/lib/queries";
 import ReconcileForm from "@/components/ReconcileForm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export default async function ReconcilePage() {
+  await requireAuth();
   const rows = await getReconcileData();
   const now = new Date();
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;

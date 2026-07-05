@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1;
 
@@ -11,6 +12,8 @@ function normMonth(v: unknown): string | null {
 
 // 固定費マスタを更新（解約＝end_monthのセット、再開＝end_monthをnullに）
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   const { id } = await params;
   const ruleId = Number(id);
   if (!Number.isInteger(ruleId) || ruleId <= 0) {
@@ -75,6 +78,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 // 固定費マスタを削除（誤登録の削除用。通常の「解約」は end_month セットを推奨）
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAuthApi();
+  if (denied) return denied;
   const { id } = await params;
   const ruleId = Number(id);
   if (!Number.isInteger(ruleId) || ruleId <= 0) {

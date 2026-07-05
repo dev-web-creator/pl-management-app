@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Noto_Sans_JP } from "next/font/google";
+import { Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
+import { getSessionUser } from "@/lib/auth";
 
-const jakarta = Plus_Jakarta_Sans({
+// 丸ゴシックで sumika の「Warm Kakeibo」の温かさを再現
+const zenMaru = Zen_Maru_Gothic({
   subsets: ["latin"],
-  variable: "--font-jakarta",
-  weight: ["400", "500", "600", "700", "800"],
-});
-const notoJp = Noto_Sans_JP({
-  subsets: ["latin"],
-  variable: "--font-noto-jp",
-  weight: ["400", "500", "700"],
+  variable: "--font-zen-maru",
+  weight: ["400", "500", "700", "900"],
 });
 
 export const metadata: Metadata = {
@@ -19,15 +16,16 @@ export const metadata: Metadata = {
   description: "個人向け損益・資産管理ダッシュボード",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const username = await getSessionUser();
   return (
-    <html lang="ja" className={`${jakarta.variable} ${notoJp.variable}`}>
+    <html lang="ja" className={zenMaru.variable}>
       <body>
-        <TopNav />
+        <TopNav username={username} />
         {children}
       </body>
     </html>

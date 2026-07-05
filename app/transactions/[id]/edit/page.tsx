@@ -6,6 +6,7 @@ import {
   getWalletOptions,
 } from "@/lib/queries";
 import AddTransactionForm from "@/components/AddTransactionForm";
+import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function EditTransactionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAuth();
   const { id } = await params;
   const txId = Number(id);
   if (!Number.isInteger(txId) || txId <= 0) notFound();

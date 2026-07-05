@@ -57,6 +57,8 @@ export default function AddTransactionForm({
   const [msg, setMsg] = useState<string | null>(null);
   // カテゴリの絞り込み（③）：部分一致でプルダウンの選択肢を絞る
   const [catFilter, setCatFilter] = useState("");
+  // 気分（任意・1〜5 / ADR-036）：現運用フォーム「いまどんな気持ち？」の再現
+  const [mood, setMood] = useState<number | null>(null);
 
   const filteredCats = catFilter
     ? categories.filter((c) => c.name.toLowerCase().includes(catFilter.toLowerCase()))
@@ -83,6 +85,7 @@ export default function AddTransactionForm({
       amount: amt,
       accrual_date: date,
       memo: memo || undefined,
+      mood: mood ?? undefined,
     };
     if (useSplit) {
       const valid = legs.filter((l) => (Number(l.amount) || 0) > 0);
@@ -254,6 +257,37 @@ export default function AddTransactionForm({
           />
         </div>
       </div>
+
+      {/* 気分（任意 / ADR-036）。現運用フォームの「いまどんな気持ち？」 */}
+      {!isEdit && (
+        <div>
+          <label className="text-xs text-slate-500">いまの気分（任意）</label>
+          <div className="flex gap-1.5 mt-1">
+            {[
+              { v: 1, e: "😩" },
+              { v: 2, e: "😕" },
+              { v: 3, e: "😐" },
+              { v: 4, e: "🙂" },
+              { v: 5, e: "😆" },
+            ].map(({ v, e }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setMood(mood === v ? null : v)}
+                aria-label={`気分${v}`}
+                className={
+                  "w-10 h-10 text-lg rounded-lg border-2 grid place-items-center " +
+                  (mood === v
+                    ? "border-emerald-500 bg-emerald-50"
+                    : "border-slate-200 bg-white opacity-60 hover:opacity-100")
+                }
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 分割払いの脚エディタ */}
       {useSplit && (

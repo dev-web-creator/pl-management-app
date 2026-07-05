@@ -36,6 +36,7 @@ const PL_COLOR: Record<string, string> = {
   deduction: "text-slate-500",
   excluded: "text-slate-400",
 };
+const MOOD_EMOJI: Record<number, string> = { 1: "😩", 2: "😕", 3: "😐", 4: "🙂", 5: "😆" };
 
 export default async function TransactionsPage({
   searchParams,
@@ -169,6 +170,7 @@ export default async function TransactionsPage({
                       </span>
                       {t.category}
                       {t.memo && <span className="text-xs text-slate-400 ml-1">/ {t.memo}</span>}
+                      {t.mood && <span className="ml-1">{MOOD_EMOJI[t.mood]}</span>}
                     </td>
                     <td className="px-3 py-2 hidden sm:table-cell text-slate-500">
                       {t.wallets ?? "—"}

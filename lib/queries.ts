@@ -517,6 +517,7 @@ export type TxRow = {
   type: string; // 'expense' | 'income'
   amount: number;
   memo: string | null;
+  mood: number | null; // 気分 1-5（ADR-036）
   wallets: string | null; // 支払い脚のウォレット名（分割は ' + ' 連結）
 };
 
@@ -548,10 +549,11 @@ export async function getMonthTransactions(
       `AND EXISTS (SELECT 1 FROM transaction_legs x WHERE x.transaction_id = t.id AND x.wallet_id = $${params.length})`
     );
   }
+  await ensureMigrated();
   const { rows } = await pool.query(
     `SELECT t.id,
             to_char(t.accrual_date, 'YYYY-MM-DD') AS date,
-            c.name AS category, c.pl_type, t.type, t.amount, t.memo,
+            c.name AS category, c.pl_type, t.type, t.amount, t.memo, t.mood,
             string_agg(w.name, ' + ' ORDER BY tl.id) AS wallets
      FROM transactions t
      JOIN categories c ON c.id = t.category_id
@@ -561,7 +563,7 @@ export async function getMonthTransactions(
        AND t.accrual_date >= $2::date
        AND t.accrual_date <  ($2::date + interval '1 month')
        ${cond.join("\n       ")}
-     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.accrual_date
+     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.mood, t.accrual_date
      ORDER BY t.accrual_date DESC, t.id DESC`,
     params
   );
@@ -590,19 +592,99 @@ export async function getDailyTotals(period: string): Promise<DailyTotal[]> {
 
 // 指定日の取引一覧（カレンダーの選択日詳細用）。
 export async function getDayTransactions(date: string): Promise<TxRow[]> {
+  await ensureMigrated();
   const { rows } = await pool.query(
     `SELECT t.id,
             to_char(t.accrual_date, 'YYYY-MM-DD') AS date,
-            c.name AS category, c.pl_type, t.type, t.amount, t.memo,
+            c.name AS category, c.pl_type, t.type, t.amount, t.memo, t.mood,
             string_agg(w.name, ' + ' ORDER BY tl.id) AS wallets
      FROM transactions t
      JOIN categories c ON c.id = t.category_id
      LEFT JOIN transaction_legs tl ON tl.transaction_id = t.id
      LEFT JOIN wallets w ON w.id = tl.wallet_id
      WHERE t.user_id = $1 AND t.accrual_date = $2::date
-     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.accrual_date
+     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.mood, t.accrual_date
      ORDER BY t.id DESC`,
     [USER_ID, date]
+  );
+  return rows;
+}
+
+// ---- 週次進捗（現運用「(週次)進捗」タブの再現 / ADR-036） ----
+export type WeeklyRow = {
+  week_start: string; // 'YYYY-MM-DD'（月曜）
+  week_end: string; // 'YYYY-MM-DD'（日曜）
+  total: number; // 変動費合計
+  groups: Record<string, number>; // 変動費ルートグループ名 → 配下合計
+};
+
+// 直近 n 週の変動費を週×ルートグループでロールアップ（月曜始まり）。
+export async function getWeeklyProgress(weeks = 12): Promise<{ groups: string[]; rows: WeeklyRow[] }> {
+  const { rows } = await pool.query(
+    `WITH RECURSIVE
+       subtree AS (
+         SELECT id AS root_id, id AS node_id FROM categories WHERE user_id=$1
+         UNION ALL
+         SELECT s.root_id, c.id FROM subtree s JOIN categories c ON c.parent_id = s.node_id
+       ),
+       roots AS (
+         SELECT id, name, display_order FROM categories
+         WHERE user_id=$1 AND pl_type='variable_cost' AND parent_id IS NULL
+       ),
+       tx AS (
+         SELECT date_trunc('week', accrual_date)::date AS wk, category_id, amount
+         FROM transactions
+         WHERE user_id=$1 AND type='expense'
+           AND accrual_date >= date_trunc('week', CURRENT_DATE) - ($2 || ' weeks')::interval
+       )
+     SELECT to_char(t.wk,'YYYY-MM-DD') AS week_start, r.name AS group_name,
+            SUM(t.amount)::int AS total
+     FROM tx t
+     JOIN subtree s ON s.node_id = t.category_id
+     JOIN roots r ON r.id = s.root_id
+     GROUP BY t.wk, r.name, r.display_order
+     ORDER BY t.wk DESC, r.display_order`,
+    [USER_ID, weeks]
+  );
+  const groupNames: string[] = [];
+  const byWeek = new Map<string, WeeklyRow>();
+  for (const r of rows) {
+    if (!groupNames.includes(r.group_name)) groupNames.push(r.group_name);
+    let w = byWeek.get(r.week_start);
+    if (!w) {
+      const end = new Date(r.week_start + "T00:00:00");
+      end.setDate(end.getDate() + 6);
+      const p = (n: number) => String(n).padStart(2, "0");
+      w = {
+        week_start: r.week_start,
+        week_end: `${end.getFullYear()}-${p(end.getMonth() + 1)}-${p(end.getDate())}`,
+        total: 0,
+        groups: {},
+      };
+      byWeek.set(r.week_start, w);
+    }
+    w.groups[r.group_name] = r.total;
+    w.total += r.total;
+  }
+  return { groups: groupNames, rows: [...byWeek.values()] };
+}
+
+// ---- 年間の予実対比（現運用サマリの「(FY)年間予算達成」再現 / ADR-036） ----
+export type FyTargetRow = { month: string; income: number; expense: number };
+
+// FY12ヶ月分の月次目標（targets）。/year の予実対比テーブル用。
+export async function getFyTargets(startPeriod: string): Promise<FyTargetRow[]> {
+  const { rows } = await pool.query(
+    `WITH months AS (
+       SELECT generate_series($2::date, ($2::date + interval '11 months'), interval '1 month')::date AS m
+     )
+     SELECT to_char(mo.m,'YYYY-MM') AS month,
+            COALESCE(MAX(t.amount) FILTER (WHERE t.metric='income'),0)::int  AS income,
+            COALESCE(MAX(t.amount) FILTER (WHERE t.metric='expense'),0)::int AS expense
+     FROM months mo
+     LEFT JOIN targets t ON t.user_id=$1 AND t.period=mo.m AND t.metric IN ('income','expense')
+     GROUP BY mo.m ORDER BY mo.m`,
+    [USER_ID, startPeriod]
   );
   return rows;
 }

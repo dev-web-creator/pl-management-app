@@ -163,8 +163,19 @@ export default async function Home({
           {/* 損益の内訳（帳簿） */}
           <div className="mt-5 border-t border-[var(--line)] pt-4 space-y-2.5">
             <LedgerRow label="可処分所得" sub="手取り・トップライン" value={pl.disposable} color="#3f9d76" />
-            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#4aafd5" />
-            <LedgerRow label="変動費" value={-pl.variable} color="#e2724f" />
+            <LedgerRow
+              label="固定費"
+              sub="実績優先"
+              value={-fixedEffective}
+              color="#4aafd5"
+              pct={pl.disposable > 0 ? Math.round((fixedEffective / pl.disposable) * 100) : null}
+            />
+            <LedgerRow
+              label="変動費"
+              value={-pl.variable}
+              color="#e2724f"
+              pct={pl.disposable > 0 ? Math.round((pl.variable / pl.disposable) * 100) : null}
+            />
           </div>
           <p className="mt-3 text-[11px] text-[var(--muted)]">
             （PL対象外）経費精算など {yen(pl.excluded)} は残高に反映し、損益には含めません。
@@ -334,11 +345,13 @@ function LedgerRow({
   sub,
   value,
   color,
+  pct,
 }: {
   label: string;
   sub?: string;
   value: number;
   color: string;
+  pct?: number | null; // 手取り（可処分所得）に対する比率（現運用シートの「収入比」）
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -350,6 +363,9 @@ function LedgerRow({
         </span>
       </span>
       <span className="text-sm font-semibold tabular-nums">
+        {pct != null && (
+          <span className="text-[10px] font-normal text-[var(--muted)] mr-2">手取り比 {pct}%</span>
+        )}
         {value < 0 ? "−" : ""}
         {yen(Math.abs(value))}
       </span>

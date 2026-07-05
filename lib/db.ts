@@ -14,6 +14,8 @@ const MIGRATIONS = `
 ALTER TABLE recurring_rules
   ADD COLUMN IF NOT EXISTS billing_cycle text NOT NULL DEFAULT 'monthly',
   ADD COLUMN IF NOT EXISTS payment_month smallint;
+ALTER TABLE transactions
+  ADD COLUMN IF NOT EXISTS mood smallint;
 `;
 
 let migrated: Promise<void> | null = null;

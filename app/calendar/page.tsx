@@ -29,6 +29,7 @@ function shortYen(n: number): string {
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+const MOOD_EMOJI: Record<number, string> = { 1: "😩", 2: "😕", 3: "😐", 4: "🙂", 5: "😆" };
 
 // カレンダー入力（②/ADR-034）：1ヶ月をカレンダー表示し、日毎の支出を確認、
 // 日付タップでその日の入力フォームと取引一覧を開く（スプレッドシートの日次タブの再現）。
@@ -156,6 +157,7 @@ export default async function CalendarPage({
                         <td className="px-3 py-2">
                           {t.category}
                           {t.memo && <span className="text-xs text-slate-400 ml-1">/ {t.memo}</span>}
+                          {t.mood && <span className="ml-1">{MOOD_EMOJI[t.mood]}</span>}
                           {t.wallets && (
                             <span className="text-[10px] text-slate-400 ml-1 hidden sm:inline">
                               （{t.wallets}）

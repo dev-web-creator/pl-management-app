@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import pool, { ensureMigrated } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth";
 
 const USER_ID = 1; // MVPは単一ユーザー
@@ -11,6 +11,7 @@ type Body = {
   amount: number;
   accrual_date: string; // 'YYYY-MM-DD'
   memo?: string;
+  mood?: number; // 気分 1-5（任意 / ADR-036）
   legs?: Leg[]; // 省略時は単一脚（amount全額を1ウォレットで）
   wallet_id?: number; // 単一脚のショートカット
 };
@@ -51,14 +52,20 @@ export async function POST(req: Request) {
     );
   }
 
+  const mood =
+    Number.isInteger(body.mood) && (body.mood as number) >= 1 && (body.mood as number) <= 5
+      ? body.mood
+      : null;
+
   // --- DBトランザクションで取引＋脚を原子的に挿入 ---
+  await ensureMigrated();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const txRes = await client.query(
-      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-      [USER_ID, category_id, type, amount, accrual_date, memo ?? null]
+      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo, mood)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [USER_ID, category_id, type, amount, accrual_date, memo ?? null, mood]
     );
     const txId = txRes.rows[0].id;
     for (const leg of legs) {

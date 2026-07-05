@@ -127,6 +127,7 @@ CREATE TABLE transactions (
   accrual_date       date NOT NULL,                        -- 発生日＝PL計上日/ADR-001
   is_confirmed       boolean NOT NULL DEFAULT true,         -- 予実の確定フラグ
   card_statement_id  bigint REFERENCES card_statements(id) ON DELETE SET NULL,
+  mood               smallint CHECK (mood BETWEEN 1 AND 5), -- 支出時の気分（現運用フォームの再現/ADR-036）
   memo               text,
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()

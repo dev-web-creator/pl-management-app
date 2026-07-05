@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { getUserFyStartMonth, getFiscalYearPL, getFiscalYearTotal } from "@/lib/queries";
+import {
+  getUserFyStartMonth,
+  getFiscalYearPL,
+  getFiscalYearTotal,
+  getFyTargets,
+} from "@/lib/queries";
 import { requireAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +40,14 @@ export default async function YearPage({
   const [ey, em] = endLabel.split("-").map(Number);
   const fyLabel = `FY${sy}（${sy}年${sm}月〜${ey}年${em}月）`;
 
-  const rows = await getFiscalYearPL(start);
+  const [rows, targets] = await Promise.all([getFiscalYearPL(start), getFyTargets(start)]);
+
+  // 年間の予実対比（ADR-036）：目標が1つでも入っている場合のみセクション表示
+  const tgTot = targets.reduce(
+    (a, t) => ({ income: a.income + t.income, expense: a.expense + t.expense }),
+    { income: 0, expense: 0 }
+  );
+  const hasTargets = tgTot.income > 0 || tgTot.expense > 0;
 
   // 複数FY比較（当年度＋過去2年度）
   const compareStarts = [addMonths(start, -24), addMonths(start, -12), start];
@@ -130,6 +142,87 @@ export default async function YearPage({
             })}
           </div>
         </section>
+
+        {/* 年間の予実対比（ADR-036）：現運用サマリの「(FY)年間予算達成」 */}
+        {hasTargets && (
+          <section className="bg-white rounded-2xl shadow-sm p-5">
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-500">
+                <span className="deco mr-1" aria-hidden="true">🎯</span>年間予算達成（予実対比）
+              </h2>
+              <Link href="/budget" className="text-[11px] text-sky-600 hover:underline">
+                月次の目標を設定 →
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs whitespace-nowrap">
+                <thead className="text-slate-400">
+                  <tr>
+                    <th className="text-left px-2 py-1.5">月</th>
+                    {rows.map((r) => (
+                      <th key={r.month} className="text-right px-2 py-1.5 tabular-nums">
+                        {Number(r.month.slice(5))}月
+                      </th>
+                    ))}
+                    <th className="text-right px-2 py-1.5">合計</th>
+                    <th className="text-right px-2 py-1.5">達成率</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y tabular-nums">
+                  <tr>
+                    <td className="px-2 py-1.5 text-slate-500">予算 収入</td>
+                    {targets.map((t) => (
+                      <td key={t.month} className="text-right px-2 py-1.5 text-slate-500">
+                        {t.income ? (t.income / 10000).toFixed(0) + "万" : "—"}
+                      </td>
+                    ))}
+                    <td className="text-right px-2 py-1.5 text-slate-500">{yen(tgTot.income)}</td>
+                    <td className="text-right px-2 py-1.5">/</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1.5 font-semibold">実績 収入</td>
+                    {rows.map((r) => (
+                      <td key={r.month} className="text-right px-2 py-1.5">
+                        {r.income ? (r.income / 10000).toFixed(0) + "万" : "—"}
+                      </td>
+                    ))}
+                    <td className="text-right px-2 py-1.5 font-semibold">{yen(tot.income)}</td>
+                    <td className="text-right px-2 py-1.5 font-bold text-emerald-600">
+                      {tgTot.income > 0 ? Math.round((tot.income / tgTot.income) * 100) + "%" : "/"}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1.5 text-slate-500">予算 支出</td>
+                    {targets.map((t) => (
+                      <td key={t.month} className="text-right px-2 py-1.5 text-slate-500">
+                        {t.expense ? (t.expense / 10000).toFixed(0) + "万" : "—"}
+                      </td>
+                    ))}
+                    <td className="text-right px-2 py-1.5 text-slate-500">{yen(tgTot.expense)}</td>
+                    <td className="text-right px-2 py-1.5">/</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1.5 font-semibold">実績 支出</td>
+                    {rows.map((r) => (
+                      <td key={r.month} className="text-right px-2 py-1.5">
+                        {r.fixed + r.variable ? ((r.fixed + r.variable) / 10000).toFixed(0) + "万" : "—"}
+                      </td>
+                    ))}
+                    <td className="text-right px-2 py-1.5 font-semibold">{yen(tot.fixed + tot.variable)}</td>
+                    <td className="text-right px-2 py-1.5 font-bold text-emerald-600">
+                      {tgTot.expense > 0
+                        ? Math.round(((tot.fixed + tot.variable) / tgTot.expense) * 100) + "%"
+                        : "/"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">
+              支出の達成率は「予算内に収まったか」（100%以下が良い）。金額は万円で丸め表示。
+            </p>
+          </section>
+        )}
 
         {/* 複数FY比較 */}
         <section className="bg-white rounded-2xl shadow-sm p-5">

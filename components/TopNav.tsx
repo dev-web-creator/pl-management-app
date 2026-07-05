@@ -13,6 +13,7 @@ const NAV = [
   { href: "/cards", label: "カード", emoji: "💳" },
   { href: "/assets", label: "資産", emoji: "🐷" },
   { href: "/budget", label: "予実", emoji: "🎯" },
+  { href: "/weekly", label: "週次", emoji: "📆" },
   { href: "/year", label: "年次", emoji: "📈" },
   { href: "/vision", label: "目標", emoji: "🌟" },
 ];

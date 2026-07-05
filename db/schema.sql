@@ -193,6 +193,9 @@ CREATE TABLE recurring_rules (
   start_month           date NOT NULL,         -- 開始年月(月初日)
   end_month             date,                  -- 終了年月。NULL=継続中。解約でセット/ADR-011
   billing_day           smallint CHECK (billing_day BETWEEN 1 AND 31),
+  billing_cycle         text NOT NULL DEFAULT 'monthly'
+                          CHECK (billing_cycle IN ('monthly','yearly')), -- 月額/年額サブスク（ADR-035）
+  payment_month         smallint CHECK (payment_month BETWEEN 1 AND 12), -- 年額の支払月（yearly時のみ）
   is_active             boolean NOT NULL DEFAULT true,
   memo                  text,
   created_at            timestamptz NOT NULL DEFAULT now(),

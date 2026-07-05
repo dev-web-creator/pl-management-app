@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV = [
   { href: "/", label: "概要", emoji: "📊" },
+  { href: "/calendar", label: "カレンダー", emoji: "📅" },
   { href: "/transactions", label: "取引", emoji: "📒" },
   { href: "/transfers", label: "振替", emoji: "🔄" },
   { href: "/fixed-costs", label: "固定費", emoji: "📌" },
@@ -28,7 +29,7 @@ export default function TopNav({ username }: { username: string | null }) {
     <nav className="nav">
       <Link href="/" className="brand">
         <span className="brand-logo" aria-hidden="true">
-          🏠
+          🌱
         </span>
         <span className="hidden sm:inline">My PL Ledger</span>
       </Link>

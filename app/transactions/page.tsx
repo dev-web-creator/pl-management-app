@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { getMonthTransactions } from "@/lib/queries";
+import {
+  getMonthTransactions,
+  getInputCategories,
+  getWalletOptions,
+  type TxFilter,
+} from "@/lib/queries";
 import DeleteTxButton from "@/components/DeleteTxButton";
 import { requireAuth } from "@/lib/auth";
 
@@ -35,14 +40,30 @@ const PL_COLOR: Record<string, string> = {
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ m?: string; type?: string; cat?: string; wallet?: string }>;
 }) {
   await requireAuth();
   const sp = await searchParams;
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
   const period = /^\d{4}-\d{2}-01$/.test(sp.m ?? "") ? (sp.m as string) : thisMonth;
-  const rows = await getMonthTransactions(period);
+
+  // 絞り込み（③）：種別/カテゴリ/決済手段
+  const filter: TxFilter = {};
+  if (sp.type === "expense" || sp.type === "income") filter.type = sp.type;
+  if (sp.cat && /^\d+$/.test(sp.cat)) filter.categoryId = Number(sp.cat);
+  if (sp.wallet && /^\d+$/.test(sp.wallet)) filter.walletId = Number(sp.wallet);
+  const filtering = !!(filter.type || filter.categoryId || filter.walletId);
+
+  const [rows, cats, wallets] = await Promise.all([
+    getMonthTransactions(period, filter),
+    getInputCategories(),
+    getWalletOptions(),
+  ]);
+  const filteredTotal = rows.reduce(
+    (s, t) => s + (t.type === "income" ? t.amount : -t.amount),
+    0
+  );
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 px-4 py-6">
@@ -69,6 +90,58 @@ export default async function TransactionsPage({
             ← ダッシュボード
           </Link>
         </header>
+
+        {/* 絞り込み（③）：選ぶだけで自動絞り込み（GETフォーム） */}
+        <form method="GET" className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="m" value={period} />
+          <label className="text-xs font-bold text-slate-500 flex flex-col gap-1">
+            種別
+            <select name="type" defaultValue={sp.type ?? ""} className="border rounded-lg px-2 py-1.5 text-sm font-normal">
+              <option value="">すべて</option>
+              <option value="expense">支出</option>
+              <option value="income">収入</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-slate-500 flex flex-col gap-1">
+            カテゴリ
+            <select name="cat" defaultValue={sp.cat ?? ""} className="border rounded-lg px-2 py-1.5 text-sm font-normal max-w-40">
+              <option value="">すべて</option>
+              {cats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-bold text-slate-500 flex flex-col gap-1">
+            決済手段
+            <select name="wallet" defaultValue={sp.wallet ?? ""} className="border rounded-lg px-2 py-1.5 text-sm font-normal max-w-40">
+              <option value="">すべて</option>
+              {wallets.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn-primary px-4 py-1.5 text-sm">
+            絞り込む
+          </button>
+          {filtering && (
+            <Link href={`/transactions?m=${period}`} className="text-xs text-sky-600 hover:underline pb-2">
+              解除
+            </Link>
+          )}
+        </form>
+
+        {filtering && (
+          <p className="text-xs text-slate-500 tabular-nums">
+            絞り込み結果：{rows.length} 件 ・ 合計{" "}
+            <span className={"font-bold " + (filteredTotal >= 0 ? "text-emerald-600" : "text-red-500")}>
+              {filteredTotal < 0 ? "−" : "+"}¥{Math.abs(filteredTotal).toLocaleString("ja-JP")}
+            </span>
+          </p>
+        )}
 
         <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
           {rows.length === 0 ? (

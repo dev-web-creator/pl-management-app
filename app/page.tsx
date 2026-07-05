@@ -163,7 +163,7 @@ export default async function Home({
           {/* 損益の内訳（帳簿） */}
           <div className="mt-5 border-t border-[var(--line)] pt-4 space-y-2.5">
             <LedgerRow label="可処分所得" sub="手取り・トップライン" value={pl.disposable} color="#3f9d76" />
-            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#ff8a7a" />
+            <LedgerRow label="固定費" sub="実績優先" value={-fixedEffective} color="#4aafd5" />
             <LedgerRow label="変動費" value={-pl.variable} color="#e2724f" />
           </div>
           <p className="mt-3 text-[11px] text-[var(--muted)]">
@@ -256,7 +256,7 @@ export default async function Home({
             変動費 内訳（グループ／自動集計）
           </h2>
           {(() => {
-            const palette = ["#ff8a7a", "#f5b642", "#3f9d76", "#7bb8e8", "#e2724f", "#c9b8a8"];
+            const palette = ["#4cb586", "#4aafd5", "#f5b642", "#e2724f", "#8fc7a9", "#a4b8ad"];
             const varTotal = varGroups.reduce((s, g) => s + g.total, 0);
             return (
               <>

@@ -49,6 +49,8 @@ export default async function EditRecurringPage({
             startMonth: rule.start_month,
             endMonth: rule.end_month,
             billingDay: rule.billing_day,
+            billingCycle: rule.billing_cycle,
+            paymentMonth: rule.payment_month,
           }}
         />
       </div>

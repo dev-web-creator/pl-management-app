@@ -18,7 +18,7 @@ export default async function LoginPage({
       <form className="login-card" method="POST" action="/api/auth/login">
         <span className="brand">
           <span className="brand-logo" aria-hidden="true">
-            🏠
+            🌱
           </span>
           My PL Ledger
         </span>

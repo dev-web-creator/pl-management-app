@@ -13,7 +13,10 @@
 - ✅ DBインスペクター（`/inspect`）：全テーブル閲覧（学習用）
 - ✅ 本番デプロイ：GitHub(private)→Vercel→Neon。PC/スマホから利用可
 - ✅ ドキュメント：要件/マスタ/ER設計/how-it-works/ADR-001〜032/デプロイ手順（Vercel+Neon）
-- ✅ デザイン刷新：sumika（BSD-3）の「Warm Kakeibo」テーマ移植＋ログイン/ログアウト（ADR-032）
+- ✅ デザイン刷新：独自「Fresh Ledger」テーマ（warm green×水色・ADR-033。土台はsumika/BSD-3・ADR-032）＋ログイン/ログアウト
+- ✅ カレンダー入力（`/calendar`）：日毎の支出表示・日付タップで入力＋明細（ADR-034）
+- ✅ 取引の絞り込み：種別/カテゴリ/決済手段＋件数・合計表示。入力フォームのカテゴリ絞り込みも（ADR-034）
+- ✅ 固定費の月額/年額サブスク分離（ADR-035）：年額は台帳管理・月次PLに出さない。DBはオートマイグレーション
 
 ## 🚧 着手中・直近の宿題
 - 🚧 **本番の認証有効化**：ログイン実装済み（ADR-032）。Vercel に `AUTH_USER` / `AUTH_PASSWORD` / `AUTH_SECRET` を設定すると有効化される（未設定の間は誰でも閲覧可のまま）。
@@ -39,6 +42,8 @@
 - ✅ 資産ダッシュボード（`/assets`）：総資産の推移（インラインSVG）・種別内訳・配当推移・**資産形成の目標達成率**（月次の総資産目標vs現在）。`getAssetTrend`/`getAssetBreakdown`/`getDividendTrend`/`getAssetTarget`。目標は予実(`/budget`)で設定。
 - ✅ 残高リコンサイル（`/reconcile`）：実残高を入力→自動算出値と照合し差（記入漏れ）を表示。`balance_snapshots`にupsert（ADR-027）。
 - ⬜ マルチユーザー / ログイン（今は `USER_ID=1` 固定・ADR-004）
+- ⬜ Googleログイン（OAuth/OIDC）：Auth.js(NextAuth)＋Google Provider＋許可メールのallowlistで置き換え可能（⑥）
+- ⬜ スプレッドシート連携（⑦）：Google Sheets MCP で現運用シートを読み、カテゴリ/入力の相違を洗い出して再現度を上げる
 - ✅ FY（年度）年次ビュー（`/year`）：FY開始月(設定/既定4月)から12ヶ月の月次PL＋年計＋黒字推移バー、前年度/翌年度送り・**FY比較（直近3年度）**（ADR-007/017）。
 - ✅ 前月比（ダッシュボードの月次黒字に前月比・前月額を表示）
 - ✅ ビジョン/目標レイヤー（`/vision`）：自由記述の箱（1ユーザー1箱・`vision_notes`テーブル新設）。まず入力できる場所を用意。将来は予実/資産目標と連動余地。

@@ -30,15 +30,17 @@ export default function AddTransactionForm({
   wallets,
   today,
   edit,
+  defaultOpen,
 }: {
   categories: InputCategory[];
   wallets: WalletOption[];
   today: string;
   edit?: EditTarget;
+  defaultOpen?: boolean; // カレンダーの日付タップ時など、最初から開いた状態にする
 }) {
   const router = useRouter();
   const isEdit = !!edit;
-  const [open, setOpen] = useState(isEdit);
+  const [open, setOpen] = useState(isEdit || !!defaultOpen);
   const [type, setType] = useState<"expense" | "income">(edit?.type ?? "expense");
   const [amount, setAmount] = useState(edit ? String(edit.amount) : "");
   const [categoryId, setCategoryId] = useState<number>(edit?.categoryId ?? categories[0]?.id ?? 0);
@@ -53,8 +55,13 @@ export default function AddTransactionForm({
   ]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // カテゴリの絞り込み（③）：部分一致でプルダウンの選択肢を絞る
+  const [catFilter, setCatFilter] = useState("");
 
-  const grouped = categories.reduce<Record<string, InputCategory[]>>((acc, c) => {
+  const filteredCats = catFilter
+    ? categories.filter((c) => c.name.toLowerCase().includes(catFilter.toLowerCase()))
+    : categories;
+  const grouped = filteredCats.reduce<Record<string, InputCategory[]>>((acc, c) => {
     (acc[c.pl_type] ??= []).push(c);
     return acc;
   }, {});
@@ -180,6 +187,22 @@ export default function AddTransactionForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-slate-500">カテゴリ</label>
+          <input
+            value={catFilter}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCatFilter(v);
+              // 絞り込み後の先頭を自動選択（現在の選択が候補から外れた場合）
+              const hits = v
+                ? categories.filter((c) => c.name.toLowerCase().includes(v.toLowerCase()))
+                : categories;
+              if (hits.length > 0 && !hits.some((c) => c.id === categoryId)) {
+                setCategoryId(hits[0].id);
+              }
+            }}
+            placeholder="🔍 絞り込み（例：食）"
+            className="w-full mt-1 border rounded-lg px-2 py-1 text-xs"
+          />
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(Number(e.target.value))}

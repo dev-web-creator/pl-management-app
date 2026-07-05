@@ -13,6 +13,8 @@ export type RecurringEdit = {
   startMonth: string; // 'YYYY-MM'
   endMonth: string | null; // 'YYYY-MM' or null
   billingDay: number | null;
+  billingCycle: "monthly" | "yearly"; // 月額/年額（ADR-035）
+  paymentMonth: number | null; // 年額の支払月
 };
 
 export default function RecurringForm({
@@ -36,6 +38,10 @@ export default function RecurringForm({
   const [startMonth, setStartMonth] = useState(edit?.startMonth ?? defaultMonth);
   const [endMonth, setEndMonth] = useState(edit?.endMonth ?? "");
   const [billingDay, setBillingDay] = useState(edit?.billingDay ? String(edit.billingDay) : "");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">(
+    edit?.billingCycle ?? "monthly"
+  );
+  const [paymentMonth, setPaymentMonth] = useState<number>(edit?.paymentMonth ?? 1);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -58,6 +64,8 @@ export default function RecurringForm({
           start_month: startMonth,
           end_month: endMonth || undefined,
           billing_day: billingDay ? parseInt(billingDay, 10) : undefined,
+          billing_cycle: billingCycle,
+          payment_month: billingCycle === "yearly" ? paymentMonth : undefined,
         }),
       });
       const d = await res.json();
@@ -107,9 +115,33 @@ export default function RecurringForm({
         />
       </div>
 
+      {/* 月額/年額の区分（ADR-035）：年額は月次PLに出さず「年額サブスク」として管理 */}
+      <div className="flex gap-2 text-sm">
+        {(["monthly", "yearly"] as const).map((c) => (
+          <button
+            key={c}
+            onClick={() => setBillingCycle(c)}
+            className={
+              "flex-1 py-2 rounded-lg font-semibold " +
+              (billingCycle === c ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500")
+            }
+          >
+            {c === "monthly" ? "月額" : "年額サブスク"}
+          </button>
+        ))}
+      </div>
+      {billingCycle === "yearly" && (
+        <p className="text-[11px] text-sky-600 bg-sky-50 rounded p-2">
+          年額サブスクは毎月の固定費（予定）には出ません。支払った月に変動費（物品購入費など）で取引入力する現運用のまま、
+          ここでは「年間いくら払っているか」の管理台帳として使えます。
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-slate-500">月額（予定）</label>
+          <label className="text-xs text-slate-500">
+            {billingCycle === "yearly" ? "年額（予定）" : "月額（予定）"}
+          </label>
           <input
             inputMode="numeric"
             value={amount}
@@ -146,16 +178,33 @@ export default function RecurringForm({
             ))}
           </select>
         </div>
-        <div>
-          <label className="text-xs text-slate-500">引落日（任意・1〜31）</label>
-          <input
-            inputMode="numeric"
-            value={billingDay}
-            onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
-            placeholder="例：27"
-            className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
-          />
-        </div>
+        {billingCycle === "yearly" ? (
+          <div>
+            <label className="text-xs text-slate-500">支払月</label>
+            <select
+              value={paymentMonth}
+              onChange={(e) => setPaymentMonth(Number(e.target.value))}
+              className="w-full mt-1 border rounded-lg px-2 py-2 text-sm"
+            >
+              {Array.from({ length: 12 }).map((_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1}月
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-slate-500">引落日（任意・1〜31）</label>
+            <input
+              inputMode="numeric"
+              value={billingDay}
+              onChange={(e) => setBillingDay(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))}
+              placeholder="例：27"
+              className="w-full mt-1 border rounded-lg px-3 py-2 text-sm tabular-nums"
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs text-slate-500">開始年月</label>
           <input

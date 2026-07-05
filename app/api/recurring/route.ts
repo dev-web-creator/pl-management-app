@@ -23,6 +23,8 @@ export async function POST(req: Request) {
     start_month?: string;
     end_month?: string;
     billing_day?: number;
+    billing_cycle?: string;
+    payment_month?: number;
   };
   try {
     b = await req.json();
@@ -47,11 +49,20 @@ export async function POST(req: Request) {
     Number.isInteger(b.billing_day) && (b.billing_day as number) >= 1 && (b.billing_day as number) <= 31
       ? b.billing_day
       : null;
+  // 月額/年額（ADR-035）。年額のときだけ支払月(1-12)を持つ。
+  const cycle = b.billing_cycle === "yearly" ? "yearly" : "monthly";
+  const payMonth =
+    cycle === "yearly" &&
+    Number.isInteger(b.payment_month) &&
+    (b.payment_month as number) >= 1 &&
+    (b.payment_month as number) <= 12
+      ? b.payment_month
+      : null;
   const { rows } = await pool.query(
     `INSERT INTO recurring_rules
-       (user_id, name, category_id, amount, settlement_wallet_id, start_month, end_month, billing_day)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-    [USER_ID, b.name.trim(), b.category_id, b.amount, b.settlement_wallet_id, start, normMonth(b.end_month), day]
+       (user_id, name, category_id, amount, settlement_wallet_id, start_month, end_month, billing_day, billing_cycle, payment_month)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+    [USER_ID, b.name.trim(), b.category_id, b.amount, b.settlement_wallet_id, start, normMonth(b.end_month), day, cycle, payMonth]
   );
   return NextResponse.json({ ok: true, id: rows[0].id });
 }

@@ -1,4 +1,4 @@
-import pool from "@/lib/db";
+import pool, { ensureMigrated } from "@/lib/db";
 
 // MVPは単一ユーザー。将来は認証から取得する。
 const USER_ID = 1;
@@ -474,15 +474,18 @@ export type FixedCostItem = {
 
 // 固定費の予実突合（ADR-030）。指定月にアクティブな固定費マスタを「予定額」とし、
 // 当月の fixed_cost 取引（category_id で突合）を「実額」として並べる。予定は取引化しない。
+// 年額サブスク（billing_cycle='yearly'）は月次PLに出さない（ADR-035）。
 export async function getFixedCostPlanVsActual(
   period = "2026-06-01"
 ): Promise<FixedCostItem[]> {
+  await ensureMigrated();
   const { rows } = await pool.query(
     `WITH active_rules AS (
        SELECT r.id, r.name, r.category_id, r.amount AS plan, w.name AS wallet_name
        FROM recurring_rules r
        LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
        WHERE r.user_id = $1 AND r.is_active
+         AND r.billing_cycle = 'monthly'
          AND r.start_month <= $2::date
          AND (r.end_month IS NULL OR r.end_month > $2::date)
      ),
@@ -517,8 +520,34 @@ export type TxRow = {
   wallets: string | null; // 支払い脚のウォレット名（分割は ' + ' 連結）
 };
 
+export type TxFilter = {
+  type?: "expense" | "income"; // 種別
+  categoryId?: number; // カテゴリ
+  walletId?: number; // 決済ウォレット（脚に含まれる取引）
+};
+
 // 指定月の取引一覧（カテゴリ名・決済ウォレット名つき）。発生日の新しい順。
-export async function getMonthTransactions(period = "2026-06-01"): Promise<TxRow[]> {
+// filter で 種別/カテゴリ/決済手段 の絞り込みができる（③）。
+export async function getMonthTransactions(
+  period = "2026-06-01",
+  filter: TxFilter = {}
+): Promise<TxRow[]> {
+  const cond: string[] = [];
+  const params: unknown[] = [USER_ID, period];
+  if (filter.type) {
+    params.push(filter.type);
+    cond.push(`AND t.type = $${params.length}`);
+  }
+  if (filter.categoryId) {
+    params.push(filter.categoryId);
+    cond.push(`AND t.category_id = $${params.length}`);
+  }
+  if (filter.walletId) {
+    params.push(filter.walletId);
+    cond.push(
+      `AND EXISTS (SELECT 1 FROM transaction_legs x WHERE x.transaction_id = t.id AND x.wallet_id = $${params.length})`
+    );
+  }
   const { rows } = await pool.query(
     `SELECT t.id,
             to_char(t.accrual_date, 'YYYY-MM-DD') AS date,
@@ -531,9 +560,49 @@ export async function getMonthTransactions(period = "2026-06-01"): Promise<TxRow
      WHERE t.user_id = $1
        AND t.accrual_date >= $2::date
        AND t.accrual_date <  ($2::date + interval '1 month')
+       ${cond.join("\n       ")}
      GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.accrual_date
      ORDER BY t.accrual_date DESC, t.id DESC`,
+    params
+  );
+  return rows;
+}
+
+// ---- カレンダー（日次入力 / ADR-034） ----
+export type DailyTotal = { date: string; expense: number; income: number };
+
+// 指定月の日毎の支出・収入合計（カレンダーのセル表示用）。
+export async function getDailyTotals(period: string): Promise<DailyTotal[]> {
+  const { rows } = await pool.query(
+    `SELECT to_char(t.accrual_date,'YYYY-MM-DD') AS date,
+            COALESCE(SUM(t.amount) FILTER (WHERE t.type='expense' AND c.pl_type IN ('fixed_cost','variable_cost')),0)::int AS expense,
+            COALESCE(SUM(t.amount) FILTER (WHERE t.type='income'  AND c.pl_type='income'),0)::int AS income
+     FROM transactions t JOIN categories c ON c.id = t.category_id
+     WHERE t.user_id = $1
+       AND t.accrual_date >= $2::date
+       AND t.accrual_date <  ($2::date + interval '1 month')
+     GROUP BY t.accrual_date
+     ORDER BY t.accrual_date`,
     [USER_ID, period]
+  );
+  return rows;
+}
+
+// 指定日の取引一覧（カレンダーの選択日詳細用）。
+export async function getDayTransactions(date: string): Promise<TxRow[]> {
+  const { rows } = await pool.query(
+    `SELECT t.id,
+            to_char(t.accrual_date, 'YYYY-MM-DD') AS date,
+            c.name AS category, c.pl_type, t.type, t.amount, t.memo,
+            string_agg(w.name, ' + ' ORDER BY tl.id) AS wallets
+     FROM transactions t
+     JOIN categories c ON c.id = t.category_id
+     LEFT JOIN transaction_legs tl ON tl.transaction_id = t.id
+     LEFT JOIN wallets w ON w.id = tl.wallet_id
+     WHERE t.user_id = $1 AND t.accrual_date = $2::date
+     GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.accrual_date
+     ORDER BY t.id DESC`,
+    [USER_ID, date]
   );
   return rows;
 }
@@ -575,17 +644,20 @@ export type RecurringRule = {
   start_month: string; // 'YYYY-MM'
   end_month: string | null; // 'YYYY-MM' or null=継続中
   billing_day: number | null;
+  billing_cycle: "monthly" | "yearly"; // 月額/年額（ADR-035）
+  payment_month: number | null; // 年額の支払月（1-12）
   is_active: boolean;
 };
 
 // 固定費マスタ一覧（継続中→終了済みの順）。
 export async function getRecurringRules(): Promise<RecurringRule[]> {
+  await ensureMigrated();
   const { rows } = await pool.query(
     `SELECT r.id, r.name, r.amount, r.category_id, c.name AS category_name,
             r.settlement_wallet_id, w.name AS wallet_name,
             to_char(r.start_month, 'YYYY-MM') AS start_month,
             to_char(r.end_month,   'YYYY-MM') AS end_month,
-            r.billing_day, r.is_active
+            r.billing_day, r.billing_cycle, r.payment_month, r.is_active
      FROM recurring_rules r
      JOIN categories c ON c.id = r.category_id
      LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
@@ -597,12 +669,13 @@ export async function getRecurringRules(): Promise<RecurringRule[]> {
 }
 
 export async function getRecurringRuleForEdit(id: number): Promise<RecurringRule | null> {
+  await ensureMigrated();
   const { rows } = await pool.query(
     `SELECT r.id, r.name, r.amount, r.category_id, c.name AS category_name,
             r.settlement_wallet_id, w.name AS wallet_name,
             to_char(r.start_month, 'YYYY-MM') AS start_month,
             to_char(r.end_month,   'YYYY-MM') AS end_month,
-            r.billing_day, r.is_active
+            r.billing_day, r.billing_cycle, r.payment_month, r.is_active
      FROM recurring_rules r
      JOIN categories c ON c.id = r.category_id
      LEFT JOIN wallets w ON w.id = r.settlement_wallet_id

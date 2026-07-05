@@ -27,6 +27,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     start_month?: string;
     end_month?: string;
     billing_day?: number;
+    billing_cycle?: string;
+    payment_month?: number;
     is_active?: boolean;
   };
   try {
@@ -52,11 +54,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     Number.isInteger(b.billing_day) && (b.billing_day as number) >= 1 && (b.billing_day as number) <= 31
       ? b.billing_day
       : null;
+  // 月額/年額（ADR-035）。年額のときだけ支払月(1-12)を持つ。
+  const cycle = b.billing_cycle === "yearly" ? "yearly" : "monthly";
+  const payMonth =
+    cycle === "yearly" &&
+    Number.isInteger(b.payment_month) &&
+    (b.payment_month as number) >= 1 &&
+    (b.payment_month as number) <= 12
+      ? b.payment_month
+      : null;
   const res = await pool.query(
     `UPDATE recurring_rules
      SET name=$1, category_id=$2, amount=$3, settlement_wallet_id=$4,
-         start_month=$5, end_month=$6, billing_day=$7, is_active=$8
-     WHERE id=$9 AND user_id=$10`,
+         start_month=$5, end_month=$6, billing_day=$7, billing_cycle=$8, payment_month=$9, is_active=$10
+     WHERE id=$11 AND user_id=$12`,
     [
       b.name.trim(),
       b.category_id,
@@ -65,6 +76,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       start,
       normMonth(b.end_month),
       day,
+      cycle,
+      payMonth,
       b.is_active ?? true,
       ruleId,
       USER_ID,

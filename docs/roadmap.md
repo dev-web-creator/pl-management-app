@@ -54,7 +54,8 @@
 - 🚧 給与明細OCR：Gemini無料枠で実装方針（要 GEMINI_API_KEY＝Google AI Studioの無料キー）。キー入手後に実装予定。
 - ✅ Phase 3 残：画面遷移図・API一覧の文書化（`docs/screens-and-api.md`）
 - ✅ ダッシュボードにカテゴリ別比率グラフ（変動費グループの構成比バー＋%）を追加（要件のBIビュー項目）
-- ❌ AWS版プロビジョニング：不採用（Vercel+Neonで安定稼働中のため成果物を撤去・ADR-031。必要になればgit履歴から復元可）
+- 🚧 AWS版プロビジョニング：**再開**（ADR-038）。Dockerfile・手順書復元済み・AWS CLI導入済み。
+  残り＝AWSアカウントの `aws configure`＋課金同意 → ECR/RDS/App Runner 構築（`docs/aws-deployment.md`）
 
 ## 今やること（直近の順番）
 1. ✅ 取引一覧＋削除（P1）

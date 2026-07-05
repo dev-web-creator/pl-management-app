@@ -326,6 +326,14 @@
   `https://<ドメイン>/api/auth/google/callback` を登録する。
 - **状態**: 有効（コードはデプロイ済み・本番有効化は env 設定待ち。ADR-032 のパスワード認証はフォールバックに降格）
 
+## ADR-038 | 2026-07-05 | AWS移行を再開（ADR-031の撤去判断を更新）
+- **決定**: ユーザーの明示的な意向により AWS 移行（App Runner + RDS・ADR-028）を再開。
+  ADR-031 で削除した `Dockerfile` / `.dockerignore` / `docs/aws-deployment.md` を git 履歴から復元し、
+  手順書を現行の認証env（ADR-037）に合わせて更新。AWS CLI v2 を開発機に導入。
+  **実プロビジョニングの実行ゲート**（ADR-028と同じ）: AWSアカウント＋`aws configure` 済み credentials・課金同意。
+- **影響範囲**: Dockerfile / .dockerignore / docs/aws-deployment.md（復元・更新）。ADR-031 の該当部分を更新。
+- **状態**: 🚧 進行中（成果物準備完了・credentials待ち）
+
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
 

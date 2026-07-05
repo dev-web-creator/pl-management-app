@@ -144,6 +144,59 @@ aws secretsmanager create-secret --name pl-app/DATABASE_URL \
 
 ---
 
+## 6.4 構築済みリソース（2026-07-06 稼働確認済み）
+
+| リソース | 値 |
+|---|---|
+| AWS版URL | https://mnuwnhxg9c.ap-northeast-1.awsapprunner.com |
+| App Runner SERVICE_ARN | `arn:aws:apprunner:ap-northeast-1:616532575651:service/pl-app/d7c2728a7a994d84ac1e3d8b53ac918b` |
+| RDS | `pl-app-db`（db.t4g.micro / pl-app-db.c5qc4soaeqy9.ap-northeast-1.rds.amazonaws.com） |
+| ECR | `616532575651.dkr.ecr.ap-northeast-1.amazonaws.com/pl-app` |
+| CodeBuild | `pl-app-build`（S3: pl-app-build-616532575651/src.zip がソース） |
+| Secrets Manager | `pl-app/DATABASE_URL` |
+| 予算アラート | $20/月（50%・80%・超過見込みでメール） |
+
+**ハマりどころの記録（実際に踏んだ）**:
+1. **新無料プランでは App Runner が使えない** → 従量課金プランへのアップグレードが必要（SubscriptionRequiredException）。
+2. **node-postgres は RDS の証明書を検証できない**（Amazon独自CA）→ 接続文字列は `sslmode=no-verify`
+   （暗号化は有効・CA検証のみスキップ。厳密にやるなら RDS CAバンドルをイメージに同梱して `sslmode=verify-full`）。
+3. **App Runner は実行時に `HOSTNAME` 環境変数をコンテナ名で上書きする** → Next.js standalone が 0.0.0.0 に
+   バインドせずヘルスチェック不通に。Dockerfile の CMD を `sh -c "HOSTNAME=0.0.0.0 node server.js"` にして解決。
+4. DBのSGは 5432 を 0.0.0.0/0 開放（App Runner のデフォルト egress は固定IPが無いため）。強パスワード＋TLS＋
+   通常時DB停止で緩和。厳密化するなら VPCコネクタ＋NAT（+$32/月）構成へ。
+
+## 6.5 日常運用：デフォルト停止（学習時だけ起動）
+
+AWS版は学習用環境なので、**普段は止めてストレージ代（$2〜3/月）だけ**にする。
+本番は Vercel + Neon が動き続けているため、止めてもアプリ利用に影響なし。
+
+```powershell
+# 学習を始めるとき（RDS起動に3〜5分かかる）
+aws rds start-db-instance --db-instance-identifier pl-app-db
+aws apprunner resume-service --service-arn <SERVICE_ARN>
+
+# 学習を終えるとき
+aws apprunner pause-service --service-arn <SERVICE_ARN>
+aws rds stop-db-instance --db-instance-identifier pl-app-db
+```
+
+> 注意：停止したRDSは**7日後にAWSが自動で再起動する**（メンテナンス仕様）。
+> EventBridge + Lambda で毎週止め直す自動化が学習ネタとして良い（TODO）。
+
+## 6.6 コード更新をAWSへ反映する手順（オンデマンド）
+
+GitHubへのpushで Vercel は自動デプロイされるが、AWS版は必要なときだけ手動で：
+
+```powershell
+# 1. ソースをzip化してS3へ → 2. CodeBuildでイメージ再ビルド → 3. App Runnerへ再デプロイ
+git archive --format=zip -o src.zip HEAD
+aws s3 cp src.zip s3://pl-app-build-616532575651/src.zip
+aws codebuild start-build --project-name pl-app-build   # 完了までみておく
+aws apprunner start-deployment --service-arn <SERVICE_ARN>
+```
+
+> 将来 GitHub Actions で「pushしたら自動でCodeBuild→App Runner」まで組めばVercelと同じ自動化になる（学習ネタ）。
+
 ## 7. 実行ゲート（チェックリスト）
 
 実際の構築を始める前に、以下をユーザーが用意・承認していること：

@@ -332,7 +332,11 @@
   手順書を現行の認証env（ADR-037）に合わせて更新。AWS CLI v2 を開発機に導入。
   **実プロビジョニングの実行ゲート**（ADR-028と同じ）: AWSアカウント＋`aws configure` 済み credentials・課金同意。
 - **影響範囲**: Dockerfile / .dockerignore / docs/aws-deployment.md（復元・更新）。ADR-031 の該当部分を更新。
-- **状態**: 🚧 進行中（成果物準備完了・credentials待ち）
+- **状態**: ✅ **稼働確認済み（2026-07-06）**。構成は当初案から2点変更:
+  1. **ローカルDockerを使わない**（会社PCのDocker Desktopライセンス問題）→ CodeBuild でクラウドビルド。
+  2. **VPCコネクタ不使用**（Google OAuth等の外向き通信にNAT +$32/月が必要になるため）→ App Runner デフォルトegress
+     ＋RDSパブリックエンドポイント（TLS・強パスワード・SG開放は通常時DB停止で緩和）。
+  日常は**デフォルト停止運用**（App Runner pause＋RDS stop＝ストレージ代のみ）。詳細・ハマりどころは docs/aws-deployment.md 6.4。
 
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断

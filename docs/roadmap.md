@@ -54,8 +54,12 @@
 - 🚧 給与明細OCR：Gemini無料枠で実装方針（要 GEMINI_API_KEY＝Google AI Studioの無料キー）。キー入手後に実装予定。
 - ✅ Phase 3 残：画面遷移図・API一覧の文書化（`docs/screens-and-api.md`）
 - ✅ ダッシュボードにカテゴリ別比率グラフ（変動費グループの構成比バー＋%）を追加（要件のBIビュー項目）
-- 🚧 AWS版プロビジョニング：**再開**（ADR-038）。Dockerfile・手順書復元済み・AWS CLI導入済み。
-  残り＝AWSアカウントの `aws configure`＋課金同意 → ECR/RDS/App Runner 構築（`docs/aws-deployment.md`）
+- ✅ AWS版プロビジョニング（ADR-038）：ECR＋CodeBuild＋RDS＋Secrets＋App Runner 稼働確認済み。
+  普段は**デフォルト停止運用**（起動/停止・再デプロイ手順は `docs/aws-deployment.md` 6.4〜6.6）
+- ⬜ AWS: RDSの7日自動再起動を毎週止め直す自動化（EventBridge＋Lambda・学習ネタ）
+- ⬜ AWS: Neon実データのRDSへのコピー（Neon接続文字列が必要）
+- ⬜ AWS: GitHub Actions→CodeBuild→App Runner の自動デプロイ（学習ネタ）
+- ⬜ AWS: Aurora Serverless v2 への移行体験（スナップショット移行・学習ネタ）
 
 ## 今やること（直近の順番）
 1. ✅ 取引一覧＋削除（P1）

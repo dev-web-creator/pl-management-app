@@ -42,8 +42,8 @@
 - ✅ 給与明細の入力（`/payslips`・`/payslips/[period]/edit`・`POST /api/payslips`[月ごとupsert]・`DELETE /api/payslips/[id]`・`PayslipForm`）。支給/控除を動的行で入力→総支給・控除合計・手取り・時給換算を自動計算。税/社保は控除で管理（支出非計上・ADR-022）。**OCRは後段**。
 - ✅ 資産ダッシュボード（`/assets`）：総資産の推移（インラインSVG）・種別内訳・配当推移・**資産形成の目標達成率**（月次の総資産目標vs現在）。`getAssetTrend`/`getAssetBreakdown`/`getDividendTrend`/`getAssetTarget`。目標は予実(`/budget`)で設定。
 - ✅ 残高リコンサイル（`/reconcile`）：実残高を入力→自動算出値と照合し差（記入漏れ）を表示。`balance_snapshots`にupsert（ADR-027）。
-- ⬜ マルチユーザー / ログイン（今は `USER_ID=1` 固定・ADR-004）
-- ⬜ Googleログイン（OAuth/OIDC）：Auth.js(NextAuth)＋Google Provider＋許可メールのallowlistで置き換え可能（⑥）
+- ✅ マルチユーザー / Googleのみログイン（ADR-037）：USER_ID動的化・メールallowlist・新規ユーザー自動プロビジョニング。
+  本番有効化は env（GOOGLE_CLIENT_ID/SECRET・AUTH_SECRET・AUTH_OWNER_EMAIL）設定待ち
 - ✅ スプレッドシート差分の洗い出し（⑦）：xlsx全23タブを精査→採用/不要/保留に取捨選択（ADR-036）
 - ⬜ 暗号資産の資産管理（bitFlyer ETH/BTC/XRP・現運用の資産管理タブ由来。wallets拡張＋価格スナップショット）
 - ⬜ 5か年PL・将来月フォーキャスト（現運用の未来月見込み入力の再現。targetsのカテゴリ別化を検討）

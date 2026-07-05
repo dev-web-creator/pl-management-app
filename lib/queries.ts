@@ -1,7 +1,9 @@
 import pool, { ensureMigrated } from "@/lib/db";
+import { currentUserId } from "@/lib/auth";
 
-// MVPは単一ユーザー。将来は認証から取得する。
-const USER_ID = 1;
+// マルチユーザー対応（ADR-037）：各クエリはログイン中ユーザーのIDで実行する。
+// 認証が無効（env未設定）のときはオーナー(1)にフォールバック。
+const uid = () => currentUserId();
 
 export type PLSummary = {
   disposable: number; // 可処分所得（トップライン）
@@ -29,7 +31,7 @@ export async function getPLSummary(period = "2026-06-01"): Promise<PLSummary> {
         - COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type IN ('fixed_cost','variable_cost')),0))::int AS surplus,
        COALESCE(SUM(amount) FILTER (WHERE pl_type='excluded'),0)::int AS excluded
      FROM x`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows[0];
 }
@@ -56,7 +58,7 @@ export async function getWalletBalances(): Promise<WalletBalance[]> {
      WHERE w.user_id = $1
        AND (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)) <> 0
      ORDER BY w.type, w.id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -87,7 +89,7 @@ export async function getAssets(): Promise<Assets> {
        COALESCE(-SUM(balance) FILTER (WHERE type='credit_card'),0)::int                       AS card_unpaid,
        COALESCE(SUM(balance),0)::int                                                          AS net_assets
      FROM bal`,
-    [USER_ID]
+    [await uid()]
   );
   return rows[0];
 }
@@ -100,7 +102,7 @@ export async function getInputCategories(): Promise<InputCategory[]> {
     `SELECT id, name, pl_type FROM categories
      WHERE user_id=$1 AND is_input_allowed AND is_active
      ORDER BY pl_type, display_order, id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -113,7 +115,7 @@ export async function getWalletOptions(): Promise<WalletOption[]> {
     `SELECT id, name, type FROM wallets
      WHERE user_id=$1 AND is_active
      ORDER BY type, display_order, id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -150,7 +152,7 @@ export async function getTableDump(table: string): Promise<TableDump> {
 
 // ---- ビジョン/目標（自由記述の箱） ----
 export async function getVisionNote(): Promise<string> {
-  const { rows } = await pool.query(`SELECT content FROM vision_notes WHERE user_id=$1`, [USER_ID]);
+  const { rows } = await pool.query(`SELECT content FROM vision_notes WHERE user_id=$1`, [await uid()]);
   return rows[0]?.content ?? "";
 }
 
@@ -189,14 +191,14 @@ export async function getReconcileData(): Promise<ReconcileRow[]> {
      ) s ON true
      WHERE b.is_balance_tracked
      ORDER BY b.type, b.id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
 
 // ---- FY（会計年度）年次ビュー（ADR-007/017） ----
 export async function getUserFyStartMonth(): Promise<number> {
-  const { rows } = await pool.query(`SELECT fiscal_year_start_month FROM users WHERE id=$1`, [USER_ID]);
+  const { rows } = await pool.query(`SELECT fiscal_year_start_month FROM users WHERE id=$1`, [await uid()]);
   return rows[0]?.fiscal_year_start_month ?? 4;
 }
 
@@ -220,7 +222,7 @@ export async function getFiscalYearPL(startPeriod: string): Promise<FyMonthPL[]>
        COALESCE(SUM(amt) FILTER (WHERE type='expense' AND pl_type='variable_cost'),0)::int AS variable
      FROM months mo LEFT JOIN agg ON agg.mo = mo.m
      GROUP BY mo.m ORDER BY mo.m`,
-    [USER_ID, startPeriod]
+    [await uid(), startPeriod]
   );
   return rows.map((r) => ({ ...r, surplus: r.income - r.fixed - r.variable }));
 }
@@ -235,7 +237,7 @@ export async function getFiscalYearTotal(startPeriod: string): Promise<FyTotal> 
             COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type='variable_cost'),0)::int AS variable
      FROM transactions t JOIN categories c ON c.id=t.category_id
      WHERE t.user_id=$1 AND t.accrual_date >= $2::date AND t.accrual_date < ($2::date + interval '12 months')`,
-    [USER_ID, startPeriod]
+    [await uid(), startPeriod]
   );
   const r = rows[0];
   return { ...r, surplus: r.income - r.fixed - r.variable };
@@ -263,7 +265,7 @@ export async function getCardSettlements(): Promise<{ card_id: number; close_key
   const { rows } = await pool.query(
     `SELECT to_wallet_id AS card_id, memo FROM transfers
      WHERE user_id=$1 AND kind='card_settlement' AND memo LIKE 'クレカ消込:%締め'`,
-    [USER_ID]
+    [await uid()]
   );
   return rows
     .map((r) => {
@@ -288,7 +290,7 @@ export async function getCardLegs(): Promise<CardLeg[]> {
      LEFT JOIN wallets sw ON sw.id = w.settlement_wallet_id
      WHERE w.user_id=$1 AND t.type='expense'
      ORDER BY w.id, t.accrual_date`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -307,14 +309,14 @@ export type BudgetVsActual = {
 export async function getAssetTarget(period: string): Promise<number> {
   const { rows } = await pool.query(
     `SELECT amount FROM targets WHERE user_id=$1 AND period=$2 AND metric='total_assets'`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows[0]?.amount ?? 0;
 }
 
 export async function getBudgetVsActual(period: string): Promise<BudgetVsActual> {
   const t = await pool.query(`SELECT metric, amount FROM targets WHERE user_id=$1 AND period=$2`, [
-    USER_ID,
+    await uid(),
     period,
   ]);
   const tg: Record<string, number> = {};
@@ -329,14 +331,14 @@ export async function getBudgetVsActual(period: string): Promise<BudgetVsActual>
      SELECT COALESCE(SUM(amount) FILTER (WHERE type='income'  AND pl_type='income'),0)::int AS inc,
             COALESCE(SUM(amount) FILTER (WHERE type='expense' AND pl_type IN ('fixed_cost','variable_cost')),0)::int AS exp
      FROM x`,
-    [USER_ID, period]
+    [await uid(), period]
   );
 
   const c = await pool.query(
     `SELECT COUNT(*) FILTER (WHERE is_closed)::int AS closed_n
      FROM monthly_closings
      WHERE user_id=$1 AND period=$2 AND section IN ('income','fixed_cost','variable_cost')`,
-    [USER_ID, period]
+    [await uid(), period]
   );
 
   return {
@@ -381,7 +383,7 @@ export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
         - COALESCE((SELECT SUM(amount+fee) FROM transfers WHERE user_id=$1 AND from_wallet_id IN (SELECT id FROM cw) AND transfer_date < (mo.m + interval '1 month')),0)
        )::int AS card_balance
      FROM months mo ORDER BY mo.m`,
-    [USER_ID]
+    [await uid()]
   );
   return rows.map((r) => ({
     month: r.month,
@@ -412,7 +414,7 @@ export async function getAssetBreakdown(): Promise<AssetTypeTotal[]> {
      SELECT type, SUM(balance)::int AS total FROM bal
      WHERE include_in_assets AND type<>'credit_card'
      GROUP BY type HAVING SUM(balance) <> 0 ORDER BY total DESC`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -426,7 +428,7 @@ export async function getDividendTrend(): Promise<MonthTotal[]> {
      FROM transactions t JOIN categories c ON c.id=t.category_id
      WHERE t.user_id=$1 AND t.type='income' AND c.name='投資収益(配当)'
      GROUP BY 1 ORDER BY 1`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -457,7 +459,7 @@ export async function getVariableGroups(period = "2026-06-01"): Promise<Category
      WHERE c.user_id=$1 AND c.pl_type='variable_cost' AND c.parent_id IS NULL
      GROUP BY c.id, c.name
      ORDER BY c.display_order, c.id`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows;
 }
@@ -504,7 +506,7 @@ export async function getFixedCostPlanVsActual(
      FROM active_rules ar
      LEFT JOIN actual a ON a.category_id = ar.category_id
      ORDER BY ar.plan DESC, ar.id`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows;
 }
@@ -534,7 +536,7 @@ export async function getMonthTransactions(
   filter: TxFilter = {}
 ): Promise<TxRow[]> {
   const cond: string[] = [];
-  const params: unknown[] = [USER_ID, period];
+  const params: unknown[] = [await uid(), period];
   if (filter.type) {
     params.push(filter.type);
     cond.push(`AND t.type = $${params.length}`);
@@ -585,7 +587,7 @@ export async function getDailyTotals(period: string): Promise<DailyTotal[]> {
        AND t.accrual_date <  ($2::date + interval '1 month')
      GROUP BY t.accrual_date
      ORDER BY t.accrual_date`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows;
 }
@@ -605,7 +607,7 @@ export async function getDayTransactions(date: string): Promise<TxRow[]> {
      WHERE t.user_id = $1 AND t.accrual_date = $2::date
      GROUP BY t.id, c.name, c.pl_type, t.type, t.amount, t.memo, t.mood, t.accrual_date
      ORDER BY t.id DESC`,
-    [USER_ID, date]
+    [await uid(), date]
   );
   return rows;
 }
@@ -644,7 +646,7 @@ export async function getWeeklyProgress(weeks = 12): Promise<{ groups: string[];
      JOIN roots r ON r.id = s.root_id
      GROUP BY t.wk, r.name, r.display_order
      ORDER BY t.wk DESC, r.display_order`,
-    [USER_ID, weeks]
+    [await uid(), weeks]
   );
   const groupNames: string[] = [];
   const byWeek = new Map<string, WeeklyRow>();
@@ -684,7 +686,7 @@ export async function getFyTargets(startPeriod: string): Promise<FyTargetRow[]> 
      FROM months mo
      LEFT JOIN targets t ON t.user_id=$1 AND t.period=mo.m AND t.metric IN ('income','expense')
      GROUP BY mo.m ORDER BY mo.m`,
-    [USER_ID, startPeriod]
+    [await uid(), startPeriod]
   );
   return rows;
 }
@@ -709,7 +711,7 @@ export async function getTransactionForEdit(id: number): Promise<TxEdit | null> 
             (SELECT count(*)::int FROM transaction_legs WHERE transaction_id = t.id) AS leg_count
      FROM transactions t
      WHERE t.id = $1 AND t.user_id = $2`,
-    [id, USER_ID]
+    [id, await uid()]
   );
   return rows[0] ?? null;
 }
@@ -745,7 +747,7 @@ export async function getRecurringRules(): Promise<RecurringRule[]> {
      LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
      WHERE r.user_id = $1
      ORDER BY (r.end_month IS NOT NULL), r.amount DESC, r.id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -762,7 +764,7 @@ export async function getRecurringRuleForEdit(id: number): Promise<RecurringRule
      JOIN categories c ON c.id = r.category_id
      LEFT JOIN wallets w ON w.id = r.settlement_wallet_id
      WHERE r.id = $1 AND r.user_id = $2`,
-    [id, USER_ID]
+    [id, await uid()]
   );
   return rows[0] ?? null;
 }
@@ -773,7 +775,7 @@ export async function getFixedCostCategories(): Promise<InputCategory[]> {
     `SELECT id, name, pl_type FROM categories
      WHERE user_id = $1 AND pl_type = 'fixed_cost' AND is_input_allowed AND is_active
      ORDER BY display_order, id`,
-    [USER_ID]
+    [await uid()]
   );
   return rows;
 }
@@ -810,7 +812,7 @@ export async function getPayslips(): Promise<PayslipSummary[]> {
             COALESCE((SELECT SUM(amount) FROM payslip_items i WHERE i.payslip_id=p.id AND i.item_type='allowance'),0)::int AS gross,
             COALESCE((SELECT SUM(amount) FROM payslip_items i WHERE i.payslip_id=p.id AND i.item_type='deduction'),0)::int AS deduction
      FROM payslips p WHERE p.user_id=$1 ORDER BY p.period DESC`,
-    [USER_ID]
+    [await uid()]
   );
   return rows.map((r) => {
     const wh = r.total_work_hours != null ? Number(r.total_work_hours) : null;
@@ -846,7 +848,7 @@ export async function getPayslipForEdit(period: string): Promise<PayslipEdit> {
   const ps = await pool.query(
     `SELECT id, total_work_hours, overtime_hours, is_confirmed
      FROM payslips WHERE user_id=$1 AND period=$2`,
-    [USER_ID, p]
+    [await uid(), p]
   );
   if (ps.rowCount === 0) {
     return { id: null, period, total_work_hours: "", overtime_hours: "", is_confirmed: false, allowances: [], deductions: [] };
@@ -880,7 +882,7 @@ export async function getMonthTransfers(period = "2026-06-01"): Promise<Transfer
        AND t.transfer_date >= $2::date
        AND t.transfer_date <  ($2::date + interval '1 month')
      ORDER BY t.transfer_date DESC, t.id DESC`,
-    [USER_ID, period]
+    [await uid(), period]
   );
   return rows;
 }

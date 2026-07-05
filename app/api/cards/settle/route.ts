@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 
 // クレカの請求サイクルを「引き落とし実行（消込）」する。
 // 銀行(引落先)→カード の transfer(kind=card_settlement) を1件作り、カード未払いを減らす。
@@ -10,6 +9,7 @@ const USER_ID = 1;
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let b: { card_id?: number; close_key?: string; amount?: number; pay_date?: string };
   try {
     b = await req.json();

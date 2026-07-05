@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 
 type Item = { name?: string; amount?: number };
 
@@ -22,6 +21,7 @@ function numOrNull(v: unknown): number | null {
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let b: {
     period?: string;
     total_work_hours?: unknown;

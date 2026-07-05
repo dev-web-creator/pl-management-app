@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1; // MVPは単一ユーザー
 
 // 固定費マスタ(recurring_rules)の「予定額」を、その月の実額取引として記録する（ADR-030の次段）。
 // body: { rule_id: number, period: 'YYYY-MM-01', amount?: number }
@@ -10,6 +9,7 @@ const USER_ID = 1; // MVPは単一ユーザー
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let body: { rule_id?: number; period?: string; amount?: number };
   try {
     body = await req.json();

@@ -67,7 +67,9 @@ flowchart TD
 | `POST /api/snapshots` | 実残高スナップショットをupsert |
 | `POST /api/cards/settle` | クレカ請求サイクルの引き落とし消込 |
 | `POST /api/vision` | ビジョン/目標の自由記述をupsert |
-| `POST /api/auth/login` | ログイン（成功でセッションCookie＋`/`へ303） |
+| `POST /api/auth/login` | パスワードログイン（Google未設定時のフォールバック） |
+| `GET /api/auth/google` | Google認可画面へリダイレクト（state Cookie発行 / ADR-037） |
+| `GET /api/auth/google/callback` | コード→トークン交換・入場判定・セッション発行 |
 | `POST /api/auth/logout` | ログアウト（Cookie削除＋`/login`へ303） |
 
 ## 設計メモ

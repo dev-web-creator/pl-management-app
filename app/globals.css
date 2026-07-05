@@ -529,6 +529,27 @@ textarea:focus {
   font-weight: 800;
 }
 
+/* Googleログインボタン（ADR-037） */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1.1rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.google-btn:hover {
+  background: #f7fbf8;
+  border-color: var(--accent);
+}
+
 .login-error {
   color: var(--expense);
   background: var(--expense-soft);

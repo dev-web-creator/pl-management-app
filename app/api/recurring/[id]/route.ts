@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 
 function normMonth(v: unknown): string | null {
   if (typeof v !== "string" || v.trim() === "") return null;
@@ -14,6 +13,7 @@ function normMonth(v: unknown): string | null {
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   const { id } = await params;
   const ruleId = Number(id);
   if (!Number.isInteger(ruleId) || ruleId <= 0) {
@@ -93,6 +93,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   const { id } = await params;
   const ruleId = Number(id);
   if (!Number.isInteger(ruleId) || ruleId <= 0) {

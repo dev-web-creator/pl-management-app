@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1; // MVPは単一ユーザー
 
 // 取引を削除（transaction_legs は ON DELETE CASCADE で自動削除）
 export async function DELETE(
@@ -11,6 +10,7 @@ export async function DELETE(
 ) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   const { id } = await params;
   const txId = Number(id);
   if (!Number.isInteger(txId) || txId <= 0) {
@@ -33,6 +33,7 @@ export async function PUT(
 ) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   const { id } = await params;
   const txId = Number(id);
   if (!Number.isInteger(txId) || txId <= 0) {

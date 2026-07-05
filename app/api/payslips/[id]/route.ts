@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 
 // 給与明細を削除（payslip_items は CASCADE）
 export async function DELETE(
@@ -11,6 +10,7 @@ export async function DELETE(
 ) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   const { id } = await params;
   const pid = Number(id);
   if (!Number.isInteger(pid) || pid <= 0) {

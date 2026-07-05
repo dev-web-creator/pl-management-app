@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import {
-  authEnabled,
+  passwordEnabled,
   checkCredentials,
   createSessionToken,
   SESSION_COOKIE,
   SESSION_MAX_AGE,
 } from "@/lib/auth";
 
-// ログイン：フォームPOST（username/password）→ 成功でセッションCookieを発行
+// パスワードログイン（Google未設定時のフォールバック）：オーナー(user 1)として入場
 export async function POST(req: Request) {
-  if (!authEnabled()) {
+  if (!passwordEnabled()) {
     return NextResponse.redirect(new URL("/", req.url), 303);
   }
   const form = await req.formData();
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   const res = NextResponse.redirect(new URL("/", req.url), 303);
-  res.cookies.set(SESSION_COOKIE, createSessionToken(username), {
+  res.cookies.set(SESSION_COOKIE, createSessionToken({ id: 1, email: username }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

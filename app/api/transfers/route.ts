@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 const KINDS = ["transfer", "charge", "cash_withdrawal", "card_settlement"];
 
 // 資金移動を作成（振替/チャージ/現金引出/カード支払い）。PL（損益）には載らない。
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let b: {
     from_wallet_id?: number;
     to_wallet_id?: number;

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool, { ensureMigrated } from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1; // MVPは単一ユーザー
 
 type Leg = { wallet_id: number; amount: number };
 type Body = {
@@ -19,6 +18,7 @@ type Body = {
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let body: Body;
   try {
     body = await req.json();

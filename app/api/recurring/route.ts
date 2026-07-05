@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import { requireAuthApi } from "@/lib/auth";
+import { requireAuthApi, currentUserId } from "@/lib/auth";
 
-const USER_ID = 1;
 
 // 月入力（'YYYY-MM' or 'YYYY-MM-01'）を月初日 'YYYY-MM-01' に正規化。空は null。
 function normMonth(v: unknown): string | null {
@@ -15,6 +14,7 @@ function normMonth(v: unknown): string | null {
 export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
+  const USER_ID = await currentUserId();
   let b: {
     name?: string;
     category_id?: number;

@@ -306,6 +306,26 @@
 - **影響範囲**: `transactions.mood`（オートマイグレーション）、`lib/queries.ts`、`/weekly`（新規）、`/year`、入力フォーム、一覧表示。
 - **状態**: 有効
 
+## ADR-037 | 2026-07-05 | Googleのみログイン＋マルチユーザー対応（ADR-004の実現形）
+- **決定**:
+  1. **Googleログイン（OIDC認可コードフロー・自前実装）**: `GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / AUTH_SECRET` が
+     揃うと有効になり、ログイン画面は**「Googleでログイン」のみ**になる（パスワード入力は廃止・Google未設定時のみフォールバックで残存）。
+     ライブラリ（Auth.js等）は使わず、`/api/auth/google`（認可リダイレクト＋state Cookie）と
+     `/api/auth/google/callback`（コード→トークン交換・id_token検証・入場判定）の2ルート約150行で実装。
+     依存ゼロで学習しやすく、Googleと直接TLS通信するため id_token の署名検証は aud/exp チェックで足りる。
+  2. **入場判定（3段階）**: ①`AUTH_OWNER_EMAIL` と一致→**オーナー(user 1)** として入場（初回に users.email を自動で紐付け）
+     ②users.email に登録済み→入場 ③`AUTH_ALLOWED_EMAILS`（カンマ区切り）に含まれる→**初期データつきでユーザー自動作成**
+     （`lib/provision.ts`：汎用スターターのウォレット3種＋カテゴリ16種。オーナーの個人マスタはコピーしない） ④その他→拒否。
+  3. **マルチユーザー化**: 全クエリ（lib/queries.ts）と全APIの `USER_ID=1` 固定を廃止し、
+     セッション（`{id, email, name}` のHMAC署名Cookie）から `currentUserId()` で解決。認証無効時はオーナー(1)にフォールバック。
+- **理由**: ユーザー要望（Googleのみログイン・他ユーザーへの提供）。パスワードを自前で預からないため漏洩リスクが構造的に消える。
+  DBは当初からマルチユーザー設計（全テーブルにuser_id・ADR-004）だったため、変更はID解決の動的化のみで済んだ。
+- **影響範囲**: `lib/auth.ts`（セッションv2）・`lib/provision.ts`（新規）・`app/api/auth/google/**`（新規）・
+  `app/login/page.tsx`・`lib/queries.ts`・全APIルート。**必要env**: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / AUTH_SECRET /
+  AUTH_OWNER_EMAIL（＋招待は AUTH_ALLOWED_EMAILS）。Google Cloud Console の承認済みリダイレクトURIに
+  `https://<ドメイン>/api/auth/google/callback` を登録する。
+- **状態**: 有効（コードはデプロイ済み・本番有効化は env 設定待ち。ADR-032 のパスワード認証はフォールバックに降格）
+
 ## 要確認リスト（予実・サマリー由来 — 潰し込み中）
 - ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
 

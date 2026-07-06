@@ -15,9 +15,12 @@ import { provisionUser } from "@/lib/provision";
 // 4. 許可判定（users.email 登録済み or AUTH_ALLOWED_EMAILS → 自動プロビジョニング）
 // 5. セッションCookie発行
 export async function GET(req: Request) {
+  // リダイレクト先は req.url でなく公開オリジンから組み立てる
+  // （App Runner等では req.url のホストが内部アドレス 0.0.0.0:3000 になるため）
+  const origin = appOrigin(req);
   const fail = (reason: string) =>
-    NextResponse.redirect(new URL(`/login?error=${reason}`, req.url), 303);
-  if (!googleEnabled()) return NextResponse.redirect(new URL("/login", req.url), 303);
+    NextResponse.redirect(`${origin}/login?error=${reason}`, 303);
+  if (!googleEnabled()) return NextResponse.redirect(`${origin}/login`, 303);
 
   const sp = new URL(req.url).searchParams;
   const code = sp.get("code");
@@ -87,7 +90,7 @@ export async function GET(req: Request) {
     userId = await provisionUser(email, payload.name);
   }
 
-  const res = NextResponse.redirect(new URL("/", req.url), 303);
+  const res = NextResponse.redirect(`${origin}/`, 303);
   res.cookies.set(SESSION_COOKIE, createSessionToken({ id: userId, email, name: payload.name }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

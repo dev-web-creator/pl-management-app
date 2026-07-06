@@ -5,7 +5,7 @@ import { googleEnabled, appOrigin } from "@/lib/auth";
 // Googleログイン開始（ADR-037）：state を発行して Google の認可画面へリダイレクト
 export async function GET(req: Request) {
   if (!googleEnabled()) {
-    return NextResponse.redirect(new URL("/login", req.url), 303);
+    return NextResponse.redirect(`${appOrigin(req)}/login`, 303);
   }
   const state = randomBytes(16).toString("hex");
   const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");

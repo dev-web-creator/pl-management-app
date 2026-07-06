@@ -180,8 +180,10 @@ aws apprunner pause-service --service-arn <SERVICE_ARN>
 aws rds stop-db-instance --db-instance-identifier pl-app-db
 ```
 
-> 注意：停止したRDSは**7日後にAWSが自動で再起動する**（メンテナンス仕様）。
-> EventBridge + Lambda で毎週止め直す自動化が学習ネタとして良い（TODO）。
+> ✅ **自動化済み（2026-07-06）**：Lambda `pl-app-stop-rds`（`infra/lambda/stop_rds.py`）が
+> EventBridge ルール `pl-app-nightly-stop`（毎日 05:00 JST）で RDS を停止する。
+> 止め忘れも「停止7日後の自動再起動」も翌朝に自動で止め直される。
+> 学習中に夜をまたぐ場合は翌朝また `start-db-instance` すればよい。
 
 ## 6.6 コード更新をAWSへ反映する手順（オンデマンド）
 

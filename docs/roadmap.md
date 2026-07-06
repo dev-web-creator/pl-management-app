@@ -57,7 +57,8 @@
 - ✅ AWS版プロビジョニング（ADR-038）：ECR＋CodeBuild＋RDS＋Secrets＋App Runner 稼働確認済み。
   普段は**デフォルト停止運用**（起動/停止・再デプロイ手順は `docs/aws-deployment.md` 6.4〜6.6）
 - ✅ AWS: RDS自動停止（Lambda pl-app-stop-rds ＋ EventBridge 毎日05:00 JST。止め忘れ・7日自動再起動対策）
-- ⬜ AWS: Neon実データのRDSへのコピー（Neon接続文字列が必要）
+- ✅ AWS: Neon実データをRDSへコピー済み（CSV経由・件数一致検証済み。Neonパスワードはローテーション済み）
+- ✅ AWS: App RunnerにもGoogleログイン適用（env/Secrets設定済み）
 - ⬜ AWS: GitHub Actions→CodeBuild→App Runner の自動デプロイ（学習ネタ）
 - ⬜ AWS: Aurora Serverless v2 への移行体験（スナップショット移行・学習ネタ）
 

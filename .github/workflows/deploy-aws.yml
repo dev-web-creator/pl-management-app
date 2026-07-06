@@ -1,0 +1,63 @@
+# master への push で AWS検証環境を自動デプロイ（ADR-038 / CI-CD化）
+#   1. ソースを zip → S3
+#   2. CodeBuild で Dockerイメージを build & ECR push（ローカルDocker不要）
+#   3. App Runner が RUNNING なら再デプロイ／停止中ならイメージ更新のみ（次回 resume 後の
+#      start-deployment で最新化。docs/aws-deployment.md 6.5 参照）
+# 認証は OIDC（AWSのキーをGitHubに保存しない）。IAMロール: pl-app-github-actions
+name: Deploy to AWS staging
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: # 手動実行も可
+
+permissions:
+  id-token: write # OIDCトークン発行に必要
+  contents: read
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+env:
+  SERVICE_ARN: arn:aws:apprunner:ap-northeast-1:616532575651:service/pl-app/d7c2728a7a994d84ac1e3d8b53ac918b
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AWS認証（OIDC・キーレス）
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::616532575651:role/pl-app-github-actions
+          aws-region: ap-northeast-1
+
+      - name: ソースをS3へアップロード
+        run: |
+          git archive --format=zip -o src.zip HEAD
+          aws s3 cp src.zip s3://pl-app-build-616532575651/src.zip
+
+      - name: CodeBuildでイメージをビルド＆ECRへプッシュ
+        run: |
+          BUILD_ID=$(aws codebuild start-build --project-name pl-app-build --query 'build.id' --output text)
+          echo "build: $BUILD_ID"
+          while true; do
+            STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" --query 'builds[0].buildStatus' --output text)
+            [ "$STATUS" != "IN_PROGRESS" ] && break
+            sleep 20
+          done
+          echo "build status: $STATUS"
+          [ "$STATUS" = "SUCCEEDED" ]
+
+      - name: App Runnerへデプロイ（停止中はスキップ）
+        run: |
+          STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query 'Service.Status' --output text)
+          echo "service status: $STATUS"
+          if [ "$STATUS" = "RUNNING" ]; then
+            aws apprunner start-deployment --service-arn "$SERVICE_ARN"
+            echo "deployment started"
+          else
+            echo "service is $STATUS — image updated only (deploys on next resume + start-deployment)"
+          fi

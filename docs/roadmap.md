@@ -59,7 +59,7 @@
 - ✅ AWS: RDS自動停止（Lambda pl-app-stop-rds ＋ EventBridge 毎日05:00 JST。止め忘れ・7日自動再起動対策）
 - ✅ AWS: Neon実データをRDSへコピー済み（CSV経由・件数一致検証済み。Neonパスワードはローテーション済み）
 - ✅ AWS: App RunnerにもGoogleログイン適用（env/Secrets設定済み）
-- ⬜ AWS: GitHub Actions→CodeBuild→App Runner の自動デプロイ（学習ネタ）
+- ✅ AWS: GitHub Actions→CodeBuild→App Runner 自動デプロイ（OIDCキーレス・停止中はイメージ更新のみ）
 - ⬜ AWS: Aurora Serverless v2 への移行体験（スナップショット移行・学習ネタ）
 
 ## 今やること（直近の順番）

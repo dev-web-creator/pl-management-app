@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listTables, getTableDump } from "@/lib/queries";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, authEnabled } from "@/lib/auth";
 
 export const dynamic = "force-dynamic"; // 毎回DBの最新を見る
 
@@ -38,13 +38,14 @@ export default async function Inspect({
   searchParams: Promise<{ key?: string }>;
 }) {
   await requireAuth();
-  // ルート単位の保護（サイト全体のmiddlewareは使わない＝過去の全ルート500を回避）。
-  // 本番(production)では INSPECT_KEY 環境変数が必須＋ ?key= 一致で閲覧可。
-  // キー未設定の本番は「安全側に倒してロック」。ローカル開発(development)は常に閲覧可。
+  // 保護の考え方（ADR-029→037で更新）:
+  //  - 認証が有効ならログイン自体が鍵（requireAuth を通過した時点で閲覧可・INSPECT_KEY不要）
+  //  - 認証が無効な本番は旧来どおり INSPECT_KEY ＋ ?key= 一致が必須（安全側に倒してロック）
+  //  - ローカル開発(development)は常に閲覧可
   const { key } = await searchParams;
   const expected = process.env.INSPECT_KEY;
   const isProd = process.env.NODE_ENV === "production";
-  const locked = isProd ? !expected || key !== expected : false;
+  const locked = isProd && !authEnabled() ? !expected || key !== expected : false;
   if (locked) {
     return (
       <main className="min-h-screen grid place-items-center p-6 text-center text-slate-700">

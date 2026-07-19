@@ -374,6 +374,31 @@
 - **影響範囲**: `app/analytics/page.tsx`（新規）・`lib/queries.ts`（getMonthlySeries/getCategoryMoM）・`components/TopNav.tsx`。
 - **状態**: 有効。※コミット 4578da9 のメッセージは「ADR-040」表記（上記と同じ番号衝突。本エントリで **ADR-041 に繰り下げ**）。
 
+## ADR-042 | 2026-07-19 | 通知基盤（変動費しきい値のメール通知）＋設定画面（/settings）
+- **決定**:
+  1. **ルールのテーブル化**: `notification_rules`（user_id・kind・threshold・channel・enabled）。
+     既定ルールは変動費しきい値 **10/15/20/25/30万円** の5行（seed・provision・オートマイグレーションのフラグ方式
+     `users.notif_defaults_seeded` で一度だけ投入＝全削除しても勝手に復活しない）。
+     **カスタマイズ＝行の追加/編集**でコード変更不要。kind は将来増やせる（例: fixed_cost_threshold）。
+  2. **「月1回だけ」の担保**: `notification_log` の UNIQUE(rule_id, period) が実体。送信前にログ行を先に確保
+     （ON CONFLICT DO NOTHING）することで同時リクエストの多重送信も防ぎ、送信失敗時はログを取り消して次回再挑戦。
+  3. **トリガーは取引の書き込み時**（POST/PUT /api/transactions 後）: cron不要でサーバーレスと相性が良い。
+     当月（JST）の変動費合計を集計→「有効・当月未通知・到達済み」のルールへメール。過去月の入力/修正では発火しない
+     （バックフィル時の通知スパム防止）。通知の失敗は取引の保存を失敗させない。
+  4. **送信は Resend の HTTP API**（`lib/notify.ts`・依存パッケージゼロ）。`RESEND_API_KEY` 未設定の間は静かにスキップ
+     （OCR/認証と同じ「envで有効化」方式）。宛先は users.email（＝Googleログインのアドレス）。
+     差出人は既定 `onboarding@resend.dev`、独自ドメイン検証後は `NOTIFY_EMAIL_FROM` で変更可。
+  5. **設定画面 `/settings`（⚙️）**: 通知ルールの追加/ON・OFF/削除・送信履歴の閲覧に加え、
+     **FY開始月の変更UI**（ADR-017の残タスク）も同居させた。
+- **理由**: ユーザー要望「変動費が10〜30万円のタイミングでログインメールへ通知＋今後カスタマイズできる形で」。
+  ルール駆動＋書き込み時判定＋envゲートは、既存アーキテクチャ（サーバーレス・依存最小・env有効化）と一貫する。
+- **影響範囲**: `db/schema.sql`（notification_rules / notification_log / users.notif_defaults_seeded）・
+  `db/migrations/004_notifications.sql`・`lib/db.ts`・`lib/notify.ts`（新規）・`lib/queries.ts`・`lib/provision.ts`・
+  `app/api/transactions/**`（フック）・`app/api/notification-rules/**`・`app/api/settings/route.ts`・
+  `app/settings/page.tsx`・`components/FySettingForm.tsx`・`components/NotificationRulesPanel.tsx`・TopNav。
+  **有効化に必要なenv**: `RESEND_API_KEY`（任意で `NOTIFY_EMAIL_FROM`）。
+- **状態**: 有効（コード完成・ローカルでルールCRUD/判定SQL/多重送信ガード検証済み。メール送信はキー設定待ち）
+
 ## 要確認リスト（クローズ済み・2026-07-19棚卸し）
 - ビジョン/目標レイヤー → ✅ `/vision`（自由記述の箱・vision_notes）として実装済み。予実/資産目標との数値連動は将来検討（roadmap）。
 - `食費合計`（日次）＝`食費(1人)`（月次）の同一性 → ✅ seedで同一カテゴリ体系に統合済み。
@@ -384,6 +409,6 @@
 ## 要確認リスト（オープン・2026-07-19棚卸し）
 - **card_statements テーブルが未使用**: 請求サイクルは都度算出（/cards）・消込は transfers の memo 締めキー方式で実装したため、
   ADR-003/023 が想定した statement 行・paid フラグは使っていない。将来の厳密消込に使うか、スキーマから撤去するか要判断。
-- **FY開始月の設定UI が無い**（ADR-017）: DB列（users.fiscal_year_start_month）と集計は対応済みだが、変更UIは未実装。当面はDB直更新で可。
+- ~~FY開始月の設定UI が無い~~ → ✅ クローズ（2026-07-19 `/settings` に実装・ADR-042）
 - ~~本番(Vercel)の認証有効化の確認~~ → ✅ クローズ（2026-07-19 ユーザー確認：Vercel も Google ログイン有効化済み・`AUTH_ALLOWED_EMAILS` で招待制運用中）
 - **OCRの有効化**: コード完成（ADR-039）。`GEMINI_API_KEY` 設定待ち（設定までボタン非表示＝安全側）。

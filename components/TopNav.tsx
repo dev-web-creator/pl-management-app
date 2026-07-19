@@ -17,6 +17,7 @@ const NAV = [
   { href: "/year", label: "年次", emoji: "📈" },
   { href: "/analytics", label: "分析", emoji: "🧮" },
   { href: "/vision", label: "目標", emoji: "🌟" },
+  { href: "/settings", label: "設定", emoji: "⚙️" },
 ];
 
 export default function TopNav({ username }: { username: string | null }) {

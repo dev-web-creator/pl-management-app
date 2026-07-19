@@ -98,6 +98,48 @@ export async function getCategoryMoM(period: string): Promise<CategoryMoM[]> {
   return rows;
 }
 
+// ---- 設定・通知（ADR-042 / ADR-017） ----
+export type UserSettings = { email: string | null; fiscal_year_start_month: number };
+
+export async function getUserSettings(): Promise<UserSettings> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `SELECT email, fiscal_year_start_month FROM users WHERE id=$1`,
+    [await uid()]
+  );
+  return rows[0] ?? { email: null, fiscal_year_start_month: 4 };
+}
+
+export type NotificationRule = { id: number; kind: string; threshold: number; enabled: boolean };
+
+export async function getNotificationRules(): Promise<NotificationRule[]> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `SELECT id, kind, threshold, enabled FROM notification_rules
+     WHERE user_id=$1 ORDER BY kind, threshold`,
+    [await uid()]
+  );
+  return rows;
+}
+
+export type NotificationLogRow = {
+  threshold: number;
+  period: string; // 'YYYY-MM'
+  sent_to: string | null;
+  sent_at: Date;
+};
+
+export async function getNotificationLog(limit = 10): Promise<NotificationLogRow[]> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `SELECT r.threshold, to_char(l.period,'YYYY-MM') AS period, l.sent_to, l.sent_at
+     FROM notification_log l JOIN notification_rules r ON r.id = l.rule_id
+     WHERE l.user_id=$1 ORDER BY l.sent_at DESC LIMIT $2`,
+    [await uid(), limit]
+  );
+  return rows;
+}
+
 export type WalletBalance = { name: string; type: string; balance: number };
 
 // ウォレット残高（取引脚＋振替から算出）。残高0は除外。

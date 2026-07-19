@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import pool, { ensureMigrated } from "@/lib/db";
 import { requireAuthApi, currentUserId } from "@/lib/auth";
+import { checkVariableCostThresholds } from "@/lib/notify";
 
 
 type Leg = { wallet_id: number; amount: number };
@@ -92,6 +93,8 @@ export async function POST(req: Request) {
       );
     }
     await client.query("COMMIT");
+    // 通知チェック（ADR-042）: 変動費のしきい値到達をメール通知。失敗しても保存は成功のまま
+    if (type === "expense") await checkVariableCostThresholds(USER_ID, accrual_date);
     return NextResponse.json({ ok: true, id: txId });
   } catch (e: unknown) {
     await client.query("ROLLBACK");

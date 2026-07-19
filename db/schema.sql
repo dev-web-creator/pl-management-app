@@ -35,6 +35,7 @@ CREATE TABLE users (
   display_name             text,
   fiscal_year_start_month  smallint NOT NULL DEFAULT 4
                              CHECK (fiscal_year_start_month BETWEEN 1 AND 12), -- FY開始月(可変/ADR-017)
+  notif_defaults_seeded    boolean NOT NULL DEFAULT false, -- 既定通知ルール投入済みフラグ(ADR-042)
   created_at               timestamptz NOT NULL DEFAULT now(),
   updated_at               timestamptz NOT NULL DEFAULT now()
 );
@@ -295,5 +296,37 @@ CREATE TABLE vision_notes (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id)
 );
+
+-- ------------------------------------------------------------
+-- 15. notification_rules（通知ルール/ADR-042）
+--     「何を・いくらで・どこへ」をユーザーごとの行で持つ＝カスタマイズは行の追加/編集
+-- ------------------------------------------------------------
+CREATE TABLE notification_rules (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       text NOT NULL DEFAULT 'variable_cost_threshold'
+               CHECK (kind IN ('variable_cost_threshold')), -- 種類は将来追加（例: fixed_cost_threshold）
+  threshold  integer NOT NULL CHECK (threshold > 0),        -- しきい値（円）
+  channel    text NOT NULL DEFAULT 'email' CHECK (channel IN ('email')),
+  enabled    boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, kind, threshold)
+);
+
+-- ------------------------------------------------------------
+-- 16. notification_log（送信履歴/ADR-042）
+--     UNIQUE(rule_id, period) が「同一しきい値は月1回だけ」の実体
+-- ------------------------------------------------------------
+CREATE TABLE notification_log (
+  id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id  bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rule_id  bigint NOT NULL REFERENCES notification_rules(id) ON DELETE CASCADE,
+  period   date NOT NULL,   -- 対象月（月初）
+  sent_to  text,
+  detail   text,
+  sent_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (rule_id, period)
+);
+CREATE INDEX idx_notiflog_user ON notification_log(user_id, period);
 
 COMMIT;

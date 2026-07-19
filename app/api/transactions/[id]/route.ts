@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireAuthApi, currentUserId } from "@/lib/auth";
+import { checkVariableCostThresholds } from "@/lib/notify";
 
 
 // 取引を削除（transaction_legs は ON DELETE CASCADE で自動削除）
@@ -89,6 +90,8 @@ export async function PUT(
       [txId, wallet_id, amount]
     );
     await client.query("COMMIT");
+    // 通知チェック（ADR-042）: 編集で当月変動費がしきい値を跨ぐこともある
+    if (type === "expense") await checkVariableCostThresholds(USER_ID, accrual_date);
     return NextResponse.json({ ok: true, id: txId });
   } catch (e) {
     await client.query("ROLLBACK");

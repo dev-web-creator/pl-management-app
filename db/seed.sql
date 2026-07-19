@@ -167,4 +167,12 @@ FROM (VALUES
 INSERT INTO targets (user_id, period, metric, amount)
 SELECT (SELECT id FROM users WHERE email='owner@example.com'), DATE '2026-04-01', 'total_assets', 100000;
 
+-- ============================================================
+-- 通知ルール（ADR-042）：変動費しきい値の既定5段（10/15/20/25/30万円）
+-- ============================================================
+INSERT INTO notification_rules (user_id, kind, threshold)
+SELECT (SELECT id FROM users WHERE email='owner@example.com'), 'variable_cost_threshold', v
+FROM (VALUES (100000),(150000),(200000),(250000),(300000)) AS t(v);
+UPDATE users SET notif_defaults_seeded = true WHERE email='owner@example.com';
+
 COMMIT;

@@ -19,6 +19,9 @@ const PREFERRED = [
   "payslips",
   "payslip_items",
   "balance_snapshots",
+  "vision_notes",
+  "notification_rules",
+  "notification_log",
 ];
 
 function fmt(v: unknown): string {

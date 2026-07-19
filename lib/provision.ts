@@ -84,6 +84,15 @@ export async function provisionUser(email: string, name?: string): Promise<numbe
       }
     }
 
+    // 既定の通知ルール（変動費 10/15/20/25/30万円 / ADR-042）
+    await client.query(
+      `INSERT INTO notification_rules (user_id, kind, threshold)
+       SELECT $1, 'variable_cost_threshold', v
+       FROM (VALUES (100000),(150000),(200000),(250000),(300000)) AS t(v)`,
+      [uid]
+    );
+    await client.query(`UPDATE users SET notif_defaults_seeded = true WHERE id = $1`, [uid]);
+
     await client.query("COMMIT");
     return uid;
   } catch (e) {

@@ -11,6 +11,7 @@ type Body = {
   accrual_date: string; // 'YYYY-MM-DD'
   memo?: string;
   mood?: number; // 気分 1-5（任意 / ADR-036）
+  client_key?: string; // 冪等キー（二重入力防止 / ADR-039）
   legs?: Leg[]; // 省略時は単一脚（amount全額を1ウォレットで）
   wallet_id?: number; // 単一脚のショートカット
 };
@@ -56,16 +57,32 @@ export async function POST(req: Request) {
     Number.isInteger(body.mood) && (body.mood as number) >= 1 && (body.mood as number) <= 5
       ? body.mood
       : null;
+  const clientKey =
+    typeof body.client_key === "string" && body.client_key.trim() !== ""
+      ? body.client_key.trim().slice(0, 100)
+      : null;
 
   // --- DBトランザクションで取引＋脚を原子的に挿入 ---
   await ensureMigrated();
+
+  // 冪等性：同じ client_key の取引が既にあれば新規作成せず既存を返す（二重入力防止）
+  if (clientKey) {
+    const dup = await pool.query(
+      `SELECT id FROM transactions WHERE user_id=$1 AND client_key=$2`,
+      [USER_ID, clientKey]
+    );
+    if ((dup.rowCount ?? 0) > 0) {
+      return NextResponse.json({ ok: true, id: dup.rows[0].id, duplicate: true });
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const txRes = await client.query(
-      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo, mood)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [USER_ID, category_id, type, amount, accrual_date, memo ?? null, mood]
+      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo, mood, client_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [USER_ID, category_id, type, amount, accrual_date, memo ?? null, mood, clientKey]
     );
     const txId = txRes.rows[0].id;
     for (const leg of legs) {
@@ -76,8 +93,18 @@ export async function POST(req: Request) {
     }
     await client.query("COMMIT");
     return NextResponse.json({ ok: true, id: txId });
-  } catch (e) {
+  } catch (e: unknown) {
     await client.query("ROLLBACK");
+    // 同時実行で client_key がユニーク違反(23505)になった場合も既存を返す（冪等）
+    if (clientKey && typeof e === "object" && e !== null && (e as { code?: string }).code === "23505") {
+      const again = await pool.query(
+        `SELECT id FROM transactions WHERE user_id=$1 AND client_key=$2`,
+        [USER_ID, clientKey]
+      );
+      if ((again.rowCount ?? 0) > 0) {
+        return NextResponse.json({ ok: true, id: again.rows[0].id, duplicate: true });
+      }
+    }
     const msg = e instanceof Error ? e.message : "不明なエラー";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   } finally {

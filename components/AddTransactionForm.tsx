@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { InputCategory, WalletOption } from "@/lib/queries";
 
@@ -59,6 +59,8 @@ export default function AddTransactionForm({
   const [catFilter, setCatFilter] = useState("");
   // 気分（任意・1〜5 / ADR-036）：現運用フォーム「いまどんな気持ち？」の再現
   const [mood, setMood] = useState<number | null>(null);
+  // 冪等キー（二重入力防止 / ADR-039）：この入力に対し1つ。保存成功で作り直す
+  const keyRef = useRef<string | null>(null);
 
   const filteredCats = catFilter
     ? categories.filter((c) => c.name.toLowerCase().includes(catFilter.toLowerCase()))
@@ -98,6 +100,11 @@ export default function AddTransactionForm({
     } else {
       body = { ...body, wallet_id: walletId };
     }
+    // 冪等キー：作成時のみ。同じ入力の再送信（連打・リトライ）は二重作成されない
+    if (!isEdit) {
+      if (!keyRef.current) keyRef.current = crypto.randomUUID();
+      body.client_key = keyRef.current;
+    }
     setBusy(true);
     try {
       const url = isEdit ? `/api/transactions/${edit!.id}` : "/api/transactions";
@@ -116,6 +123,7 @@ export default function AddTransactionForm({
         setMsg("✓ 保存しました（#" + data.id + "）");
         setAmount("");
         setMemo("");
+        keyRef.current = null; // 次の入力は別エントリ＝別キー
         router.refresh();
       }
     } catch (e) {

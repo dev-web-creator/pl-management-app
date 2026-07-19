@@ -48,6 +48,7 @@ flowchart TD
 | `/year` | FY年次ビュー | 年間PL・月次内訳・黒字推移・FY比較 |
 | `/weekly` | 週次進捗（ADR-036） | 週×変動費グループの自動ロールアップ（直近12週） |
 | `/analytics` | 分析（ADR-041） | 今月vs直近平均・12ヶ月推移チャート・カテゴリ前月比 |
+| `/forecast` | 5か年PL（ADR-044） | 60ヶ月の実績＋見込み・FYサマリ・純資産予測ライン |
 | `/settings` | 設定（ADR-017/042） | FY開始月の変更、メール通知ルールの追加/ON・OFF/削除、送信履歴 |
 | `/vision` | ビジョン/目標 | 自由記述の箱 |
 | `/inspect` | DBインスペクター | 全テーブル閲覧（本番は `INSPECT_KEY` ＋ `?key=`） |
@@ -79,6 +80,7 @@ flowchart TD
 | `POST /api/notification-rules` | 通知ルール（変動費しきい値）を追加（ADR-042） |
 | `PUT /api/notification-rules/[id]` | 通知ルールの ON/OFF |
 | `DELETE /api/notification-rules/[id]` | 通知ルール削除（送信履歴もCASCADE） |
+| `POST /api/wallets` | ウォレット追加（当面 type='crypto' のみ / ADR-043） |
 | `POST /api/auth/login` | パスワードログイン（Google未設定時のフォールバック） |
 | `GET /api/auth/google` | Google認可画面へリダイレクト（state Cookie発行 / ADR-037） |
 | `GET /api/auth/google/callback` | コード→トークン交換・入場判定・セッション発行 |

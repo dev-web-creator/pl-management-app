@@ -18,9 +18,10 @@ export async function POST(req: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.as_of_date ?? "")) {
     return NextResponse.json({ ok: false, error: "as_of_date(YYYY-MM-DD) が必要です" }, { status: 400 });
   }
-  const items = (b.items ?? []).filter(
-    (i) => Number.isInteger(i.wallet_id) && Number.isFinite(Number(i.actual_balance))
-  );
+  // wallet_id は bigint（pgからは文字列で返る）ため数値化してから検証する
+  const items = (b.items ?? [])
+    .map((i) => ({ wallet_id: Number(i.wallet_id), actual_balance: i.actual_balance }))
+    .filter((i) => Number.isInteger(i.wallet_id) && i.wallet_id > 0 && Number.isFinite(Number(i.actual_balance)));
   if (items.length === 0) {
     return NextResponse.json({ ok: false, error: "items がありません" }, { status: 400 });
   }
@@ -28,9 +29,10 @@ export async function POST(req: Request) {
   try {
     await client.query("BEGIN");
     for (const it of items) {
+      // 自分のウォレットにのみ書ける（他ユーザーの wallet_id を弾く）
       await client.query(
         `INSERT INTO balance_snapshots (user_id, wallet_id, as_of_date, actual_balance)
-         VALUES ($1,$2,$3,$4)
+         SELECT $1, w.id, $3, $4 FROM wallets w WHERE w.id=$2 AND w.user_id=$1
          ON CONFLICT (wallet_id, as_of_date) DO UPDATE SET actual_balance=EXCLUDED.actual_balance`,
         [USER_ID, it.wallet_id, b.as_of_date, Math.round(Number(it.actual_balance))]
       );

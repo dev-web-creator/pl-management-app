@@ -140,6 +140,47 @@ export async function getNotificationLog(limit = 10): Promise<NotificationLogRow
   return rows;
 }
 
+// ---- 5か年PL・フォーキャスト（ADR-044） ----
+export type ForecastInputs = {
+  fyStartMonth: number;
+  /** 全期間の月次実績（収入/固定費/変動費） */
+  actuals: { month: string; income: number; fixed: number; variable: number }[];
+  /** 月次目標（income/expense のみ） */
+  targets: { period: string; metric: string; amount: number }[];
+  /** 月額の固定費マスタ（未来月の固定費見込みに使用） */
+  rules: { amount: number; start_month: string; end_month: string | null }[];
+  netAssets: number;
+};
+
+export async function getForecastInputs(): Promise<ForecastInputs> {
+  await ensureMigrated();
+  const id = await uid();
+  const [fyStartMonth, assets] = await Promise.all([getUserFyStartMonth(), getAssets()]);
+  const [a, t, r] = await Promise.all([
+    pool.query(
+      `SELECT to_char(date_trunc('month', t.accrual_date),'YYYY-MM') AS month,
+         COALESCE(SUM(t.amount) FILTER (WHERE t.type='income'  AND c.pl_type='income'),0)::int        AS income,
+         COALESCE(SUM(t.amount) FILTER (WHERE t.type='expense' AND c.pl_type='fixed_cost'),0)::int    AS fixed,
+         COALESCE(SUM(t.amount) FILTER (WHERE t.type='expense' AND c.pl_type='variable_cost'),0)::int AS variable
+       FROM transactions t JOIN categories c ON c.id = t.category_id
+       WHERE t.user_id=$1 GROUP BY 1 ORDER BY 1`,
+      [id]
+    ),
+    pool.query(
+      `SELECT to_char(period,'YYYY-MM') AS period, metric, amount::int AS amount
+       FROM targets WHERE user_id=$1 AND metric IN ('income','expense')`,
+      [id]
+    ),
+    pool.query(
+      `SELECT amount::int AS amount, to_char(start_month,'YYYY-MM') AS start_month,
+              to_char(end_month,'YYYY-MM') AS end_month
+       FROM recurring_rules WHERE user_id=$1 AND billing_cycle='monthly'`,
+      [id]
+    ),
+  ]);
+  return { fyStartMonth, actuals: a.rows, targets: t.rows, rules: r.rows, netAssets: assets.net_assets };
+}
+
 export type WalletBalance = { name: string; type: string; balance: number };
 
 // ウォレット残高（取引脚＋振替から算出）。残高0は除外。
@@ -152,16 +193,26 @@ export async function getWalletBalances(): Promise<WalletBalance[]> {
        WHERE t.user_id = $1 GROUP BY tl.wallet_id
      ),
      tr_in  AS (SELECT to_wallet_id   AS wid, SUM(amount)     AS a FROM transfers WHERE user_id=$1 GROUP BY to_wallet_id),
-     tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id)
-     SELECT w.name, w.type,
-       (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0))::int AS balance
-     FROM wallets w
-     LEFT JOIN legs   ON legs.wallet_id = w.id
-     LEFT JOIN tr_in  ON tr_in.wid  = w.id
-     LEFT JOIN tr_out ON tr_out.wid = w.id
-     WHERE w.user_id = $1
-       AND (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)) <> 0
-     ORDER BY w.type, w.id`,
+     tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
+     bal AS (
+       SELECT w.name, w.type,
+         -- crypto は最新スナップショット（評価額の手入力）を「正」とする（ADR-043）
+         (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+               ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END)::int AS balance,
+         w.id
+       FROM wallets w
+       LEFT JOIN legs   ON legs.wallet_id = w.id
+       LEFT JOIN tr_in  ON tr_in.wid  = w.id
+       LEFT JOIN tr_out ON tr_out.wid = w.id
+       LEFT JOIN LATERAL (
+         SELECT actual_balance FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+       ) cs ON w.type='crypto'
+       WHERE w.user_id = $1
+     )
+     SELECT name, type, balance FROM bal
+     WHERE balance <> 0
+     ORDER BY type, id`,
     [await uid()]
   );
   return rows;
@@ -181,11 +232,17 @@ export async function getAssets(): Promise<Assets> {
      tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
      bal AS (
        SELECT w.type, w.include_in_assets,
-         (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)) AS balance
+         -- crypto は最新スナップショット（評価額）を「正」とする（ADR-043）
+         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+              ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END AS balance
        FROM wallets w
        LEFT JOIN legs ON legs.wallet_id=w.id
        LEFT JOIN tr_in ON tr_in.wid=w.id
        LEFT JOIN tr_out ON tr_out.wid=w.id
+       LEFT JOIN LATERAL (
+         SELECT actual_balance FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+       ) cs ON w.type='crypto'
        WHERE w.user_id=$1
      )
      SELECT
@@ -469,9 +526,11 @@ export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
               date_trunc('month', CURRENT_DATE)::date AS end_m
      ),
      months AS (SELECT generate_series((SELECT start_m FROM bounds),(SELECT end_m FROM bounds), interval '1 month')::date AS m),
-     aw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type<>'credit_card'),
+     aw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type NOT IN ('credit_card','crypto')),
      cw AS (SELECT id FROM wallets WHERE user_id=$1 AND type='credit_card'),
-     init AS (SELECT COALESCE(SUM(initial_balance),0) AS v FROM wallets WHERE user_id=$1 AND include_in_assets AND type<>'credit_card')
+     -- crypto は各月末時点の最新スナップショット（評価額）で評価（ADR-043）
+     crw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type='crypto'),
+     init AS (SELECT COALESCE(SUM(initial_balance),0) AS v FROM wallets WHERE user_id=$1 AND include_in_assets AND type NOT IN ('credit_card','crypto'))
      SELECT to_char(mo.m,'YYYY-MM') AS month,
        ((SELECT v FROM init)
         + COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END)
@@ -479,6 +538,12 @@ export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
                     WHERE t.user_id=$1 AND tl.wallet_id IN (SELECT id FROM aw) AND t.accrual_date < (mo.m + interval '1 month')),0)
         + COALESCE((SELECT SUM(amount)     FROM transfers WHERE user_id=$1 AND to_wallet_id   IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
         - COALESCE((SELECT SUM(amount+fee) FROM transfers WHERE user_id=$1 AND from_wallet_id IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
+        + COALESCE((SELECT SUM(cv.v) FROM crw c
+                    CROSS JOIN LATERAL (
+                      SELECT s.actual_balance AS v FROM balance_snapshots s
+                      WHERE s.wallet_id = c.id AND s.as_of_date < (mo.m + interval '1 month')
+                      ORDER BY s.as_of_date DESC LIMIT 1
+                    ) cv),0)
        )::int AS total_assets,
        ( COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END)
                     FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
@@ -510,14 +575,39 @@ export async function getAssetBreakdown(): Promise<AssetTypeTotal[]> {
      tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
      bal AS (
        SELECT w.type, w.include_in_assets,
-         (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)) AS balance
+         -- crypto は最新スナップショット（評価額）を「正」とする（ADR-043）
+         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+              ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END AS balance
        FROM wallets w
        LEFT JOIN legs ON legs.wallet_id=w.id LEFT JOIN tr_in ON tr_in.wid=w.id LEFT JOIN tr_out ON tr_out.wid=w.id
+       LEFT JOIN LATERAL (
+         SELECT actual_balance FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+       ) cs ON w.type='crypto'
        WHERE w.user_id=$1
      )
      SELECT type, SUM(balance)::int AS total FROM bal
      WHERE include_in_assets AND type<>'credit_card'
      GROUP BY type HAVING SUM(balance) <> 0 ORDER BY total DESC`,
+    [await uid()]
+  );
+  return rows;
+}
+
+export type CryptoWallet = { id: number; name: string; value: number | null; as_of: string | null };
+
+// 暗号資産ウォレット一覧＋最新評価額（ADR-043）。
+export async function getCryptoWallets(): Promise<CryptoWallet[]> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `SELECT w.id, w.name, s.actual_balance AS value, to_char(s.as_of_date,'YYYY-MM-DD') AS as_of
+     FROM wallets w
+     LEFT JOIN LATERAL (
+       SELECT actual_balance, as_of_date FROM balance_snapshots s
+       WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+     ) s ON true
+     WHERE w.user_id=$1 AND w.type='crypto' AND w.is_active
+     ORDER BY w.display_order, w.id`,
     [await uid()]
   );
   return rows;

@@ -5,8 +5,10 @@ import {
   getAssetBreakdown,
   getDividendTrend,
   getAssetTarget,
+  getCryptoWallets,
 } from "@/lib/queries";
 import { requireAuth } from "@/lib/auth";
+import CryptoPanel from "@/components/CryptoPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +21,21 @@ const TYPE_LABEL: Record<string, string> = {
   prepaid: "プリペイド",
   points: "ポイント",
   cash: "現金",
+  crypto: "暗号資産",
 };
 
 export default async function AssetsPage() {
   await requireAuth();
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-  const [assets, trend, breakdown, dividends, assetTarget] = await Promise.all([
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const [assets, trend, breakdown, dividends, assetTarget, cryptos] = await Promise.all([
     getAssets(),
     getAssetTrend(),
     getAssetBreakdown(),
     getDividendTrend(),
     getAssetTarget(thisMonth),
+    getCryptoWallets(),
   ]);
   const achievePct = assetTarget > 0 ? Math.round((assets.total_assets / assetTarget) * 100) : null;
 
@@ -153,6 +158,16 @@ export default async function AssetsPage() {
               </div>
             </>
           )}
+        </section>
+
+        {/* 暗号資産（ADR-043） */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-500 mb-3">₿ 暗号資産（評価額の手入力）</h2>
+          <CryptoPanel wallets={cryptos} today={today} />
+          <p className="text-[11px] text-slate-400 mt-3">
+            価格APIには依存せず、その時の評価額を円で手入力する方式（実現主義・ADR-014と整合）。
+            最新の評価額が総資産・純資産・推移グラフに反映されます。購入は「振替（銀行→銘柄）」、売却益は「投資収益」で記録。
+          </p>
         </section>
 
         {/* 配当の推移 */}

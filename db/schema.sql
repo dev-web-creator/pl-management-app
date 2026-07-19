@@ -50,7 +50,7 @@ CREATE TABLE wallets (
   user_id               bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name                  text NOT NULL,
   type                  text NOT NULL
-                          CHECK (type IN ('bank','credit_card','prepaid','points','cash')),
+                          CHECK (type IN ('bank','credit_card','prepaid','points','cash','crypto')),
   branch                text,                         -- 支店（浜松町 等）
   initial_balance       integer NOT NULL DEFAULT 0,   -- 開始残高（現在残高の起点/ADR-002）
   is_balance_tracked    boolean NOT NULL DEFAULT true, -- 現金=false（残高は追わない/ADR-015）

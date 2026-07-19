@@ -175,4 +175,12 @@ SELECT (SELECT id FROM users WHERE email='owner@example.com'), 'variable_cost_th
 FROM (VALUES (100000),(150000),(200000),(250000),(300000)) AS t(v);
 UPDATE users SET notif_defaults_seeded = true WHERE email='owner@example.com';
 
+-- ============================================================
+-- 暗号資産ウォレット（ADR-043）：評価額は balance_snapshots に手入力
+-- ============================================================
+INSERT INTO wallets (user_id, name, type, display_order) VALUES
+  ((SELECT id FROM users WHERE email='owner@example.com'), 'bitFlyer ETH', 'crypto', 100),
+  ((SELECT id FROM users WHERE email='owner@example.com'), 'bitFlyer BTC', 'crypto', 101),
+  ((SELECT id FROM users WHERE email='owner@example.com'), 'bitFlyer XRP', 'crypto', 102);
+
 COMMIT;

@@ -10,6 +10,7 @@ const TYPE_LABEL: Record<string, string> = {
   bank: "銀行",
   prepaid: "プリペイド",
   points: "ポイント",
+  crypto: "暗号資産",
   credit_card: "クレカ",
 };
 

@@ -53,6 +53,10 @@ CROSS JOIN (VALUES (100000),(150000),(200000),(250000),(300000)) AS t(v)
 WHERE NOT u.notif_defaults_seeded
 ON CONFLICT (user_id, kind, threshold) DO NOTHING;
 UPDATE users SET notif_defaults_seeded = true WHERE NOT notif_defaults_seeded;
+-- 暗号資産（ADR-043）: wallets.type に 'crypto' を追加（残高＝最新スナップショットの評価額）
+ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_type_check;
+ALTER TABLE wallets ADD CONSTRAINT wallets_type_check
+  CHECK (type IN ('bank','credit_card','prepaid','points','cash','crypto'));
 `;
 
 let migrated: Promise<void> | null = null;

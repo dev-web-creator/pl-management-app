@@ -34,6 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
   prepaid: "プリペイド",
   points: "ポイント",
   cash: "現金",
+  crypto: "暗号資産",
   credit_card: "クレカ(未払い)",
 };
 

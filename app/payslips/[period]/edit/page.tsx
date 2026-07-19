@@ -26,7 +26,7 @@ export default async function EditPayslipPage({
             ← 給与明細一覧
           </Link>
         </header>
-        <PayslipForm initial={data} />
+        <PayslipForm initial={data} ocrEnabled={!!process.env.GEMINI_API_KEY} />
       </div>
     </main>
   );

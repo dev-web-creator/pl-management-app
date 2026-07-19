@@ -28,7 +28,13 @@ const DEFAULT_DEDUCTIONS = [
 
 const seed = (names: string[]): PayslipItemRow[] => names.map((name) => ({ name, amount: 0 }));
 
-export default function PayslipForm({ initial }: { initial: PayslipEdit }) {
+export default function PayslipForm({
+  initial,
+  ocrEnabled,
+}: {
+  initial: PayslipEdit;
+  ocrEnabled?: boolean; // GEMINI_API_KEY 設定時のみ true（ADR-039）
+}) {
   const router = useRouter();
   const [workHours, setWorkHours] = useState(initial.total_work_hours);
   const [overtime, setOvertime] = useState(initial.overtime_hours);
@@ -41,6 +47,50 @@ export default function PayslipForm({ initial }: { initial: PayslipEdit }) {
   );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+
+  // 画像を縮小してbase64化（スマホ写真をそのまま送るとデカすぎるため最大1600pxのJPEGに）
+  async function toResizedBase64(file: File): Promise<{ data: string; mime: string }> {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    return { data: dataUrl.split(",")[1], mime: "image/jpeg" };
+  }
+
+  async function runOcr(file: File) {
+    setMsg(null);
+    setOcrBusy(true);
+    try {
+      const { data, mime } = await toResizedBase64(file);
+      const res = await fetch("/api/payslips/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: data, mime_type: mime }),
+      });
+      const d = await res.json();
+      if (!d.ok) {
+        setMsg("読み取り失敗: " + d.error);
+        return;
+      }
+      // 読み取れた分だけ反映（空配列なら既存を保持）
+      if (d.data.allowances.length) setAllowances(d.data.allowances);
+      if (d.data.deductions.length) setDeductions(d.data.deductions);
+      if (d.data.total_work_hours != null) setWorkHours(String(d.data.total_work_hours));
+      if (d.data.overtime_hours != null) setOvertime(String(d.data.overtime_hours));
+      setMsg(
+        `📷 読み取り完了：支給${d.data.allowances.length}項目・控除${d.data.deductions.length}項目。` +
+          "内容を確認・修正してから保存してください"
+      );
+    } catch (e) {
+      setMsg("読み取りエラー: " + (e instanceof Error ? e.message : ""));
+    } finally {
+      setOcrBusy(false);
+    }
+  }
 
   const gross = allowances.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const dedTotal = deductions.reduce((s, r) => s + (Number(r.amount) || 0), 0);
@@ -135,6 +185,29 @@ export default function PayslipForm({ initial }: { initial: PayslipEdit }) {
 
   return (
     <section className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+      {/* OCR自動入力（GEMINI_API_KEY設定時のみ表示 / ADR-039） */}
+      {ocrEnabled && (
+        <label
+          className={
+            "flex items-center justify-center gap-2 border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-xl py-3 text-sm font-semibold text-emerald-700 cursor-pointer hover:bg-emerald-50 " +
+            (ocrBusy ? "opacity-60 pointer-events-none" : "")
+          }
+        >
+          {ocrBusy ? "🔍 読み取り中…（10秒ほど）" : "📷 給与明細の画像から自動入力"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={ocrBusy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) runOcr(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-slate-500">総労働時間（h）</label>

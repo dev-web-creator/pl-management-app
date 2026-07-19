@@ -15,6 +15,7 @@ const NAV = [
   { href: "/budget", label: "予実", emoji: "🎯" },
   { href: "/weekly", label: "週次", emoji: "📆" },
   { href: "/year", label: "年次", emoji: "📈" },
+  { href: "/analytics", label: "分析", emoji: "🧮" },
   { href: "/vision", label: "目標", emoji: "🌟" },
 ];
 

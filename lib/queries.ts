@@ -36,6 +36,68 @@ export async function getPLSummary(period = "2026-06-01"): Promise<PLSummary> {
   return rows[0];
 }
 
+// ---- アナリティクス（月次比較・可視化 / ADR-040） ----
+export type MonthPoint = { month: string; income: number; expense: number; surplus: number };
+
+// 直近 n ヶ月の 収入 / 支出(固定+変動) / 黒字 の推移。
+export async function getMonthlySeries(n = 12): Promise<MonthPoint[]> {
+  const { rows } = await pool.query(
+    `WITH months AS (
+       SELECT generate_series(
+         date_trunc('month', CURRENT_DATE) - (($2::int - 1) * interval '1 month'),
+         date_trunc('month', CURRENT_DATE),
+         interval '1 month'
+       )::date AS m
+     ),
+     agg AS (
+       SELECT date_trunc('month', t.accrual_date)::date AS mo, t.type, c.pl_type, SUM(t.amount) AS amt
+       FROM transactions t JOIN categories c ON c.id = t.category_id
+       WHERE t.user_id = $1
+         AND t.accrual_date >= (date_trunc('month', CURRENT_DATE) - (($2::int - 1) * interval '1 month'))
+       GROUP BY 1,2,3
+     )
+     SELECT to_char(mo.m,'YYYY-MM') AS month,
+       COALESCE(SUM(amt) FILTER (WHERE type='income'  AND pl_type='income'),0)::int AS income,
+       COALESCE(SUM(amt) FILTER (WHERE type='expense' AND pl_type IN ('fixed_cost','variable_cost')),0)::int AS expense
+     FROM months mo LEFT JOIN agg ON agg.mo = mo.m
+     GROUP BY mo.m ORDER BY mo.m`,
+    [await uid(), n]
+  );
+  return rows.map((r) => ({ ...r, surplus: r.income - r.expense }));
+}
+
+export type CategoryMoM = { name: string; pl_type: string; this_month: number; last_month: number };
+
+// 支出カテゴリ（葉）の今月トップと前月比。
+export async function getCategoryMoM(period: string): Promise<CategoryMoM[]> {
+  const { rows } = await pool.query(
+    `WITH cur AS (
+       SELECT category_id, SUM(amount) AS amt FROM transactions
+       WHERE user_id=$1 AND type='expense'
+         AND accrual_date >= $2::date AND accrual_date < ($2::date + interval '1 month')
+       GROUP BY 1
+     ),
+     prev AS (
+       SELECT category_id, SUM(amount) AS amt FROM transactions
+       WHERE user_id=$1 AND type='expense'
+         AND accrual_date >= ($2::date - interval '1 month') AND accrual_date < $2::date
+       GROUP BY 1
+     )
+     SELECT c.name, c.pl_type,
+            COALESCE(cur.amt,0)::int AS this_month,
+            COALESCE(prev.amt,0)::int AS last_month
+     FROM categories c
+     LEFT JOIN cur  ON cur.category_id = c.id
+     LEFT JOIN prev ON prev.category_id = c.id
+     WHERE c.user_id=$1 AND c.is_input_allowed
+       AND (cur.amt IS NOT NULL OR prev.amt IS NOT NULL)
+     ORDER BY COALESCE(cur.amt,0) DESC, COALESCE(prev.amt,0) DESC
+     LIMIT 8`,
+    [await uid(), period]
+  );
+  return rows;
+}
+
 export type WalletBalance = { name: string; type: string; balance: number };
 
 // ウォレット残高（取引脚＋振替から算出）。残高0は除外。

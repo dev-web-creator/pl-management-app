@@ -11,7 +11,7 @@ type Body = {
   accrual_date: string; // 'YYYY-MM-DD'
   memo?: string;
   mood?: number; // 気分 1-5（任意 / ADR-036）
-  client_key?: string; // 冪等キー（二重入力防止 / ADR-039）
+  client_key?: string; // 冪等キー（二重入力防止 / ADR-040）
   legs?: Leg[]; // 省略時は単一脚（amount全額を1ウォレットで）
   wallet_id?: number; // 単一脚のショートカット
 };

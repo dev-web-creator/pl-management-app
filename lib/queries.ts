@@ -36,7 +36,7 @@ export async function getPLSummary(period = "2026-06-01"): Promise<PLSummary> {
   return rows[0];
 }
 
-// ---- アナリティクス（月次比較・可視化 / ADR-040） ----
+// ---- アナリティクス（月次比較・可視化 / ADR-041） ----
 export type MonthPoint = { month: string; income: number; expense: number; surplus: number };
 
 // 直近 n ヶ月の 収入 / 支出(固定+変動) / 黒字 の推移。

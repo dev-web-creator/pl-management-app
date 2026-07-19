@@ -16,7 +16,7 @@ ALTER TABLE recurring_rules
   ADD COLUMN IF NOT EXISTS payment_month smallint;
 ALTER TABLE transactions
   ADD COLUMN IF NOT EXISTS mood smallint;
--- 冪等キー（二重入力防止 / ADR-039）: 同じ client_key の再送信は新規作成せず既存を返す
+-- 冪等キー（二重入力防止 / ADR-040）: 同じ client_key の再送信は新規作成せず既存を返す
 ALTER TABLE transactions
   ADD COLUMN IF NOT EXISTS client_key text;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tx_user_client_key

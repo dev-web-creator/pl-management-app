@@ -128,6 +128,7 @@ CREATE TABLE transactions (
   is_confirmed       boolean NOT NULL DEFAULT true,         -- 予実の確定フラグ
   card_statement_id  bigint REFERENCES card_statements(id) ON DELETE SET NULL,
   mood               smallint CHECK (mood BETWEEN 1 AND 5), -- 支出時の気分（現運用フォームの再現/ADR-036）
+  client_key         text,                                  -- 冪等キー（二重入力防止/ADR-040）
   memo               text,
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()
@@ -135,6 +136,9 @@ CREATE TABLE transactions (
 CREATE INDEX idx_tx_user_date ON transactions(user_id, accrual_date);
 CREATE INDEX idx_tx_category ON transactions(category_id);
 CREATE INDEX idx_tx_statement ON transactions(card_statement_id);
+-- 同一ユーザー×同一client_keyの取引は1件のみ（NULLは対象外の部分索引/ADR-040）
+CREATE UNIQUE INDEX uq_tx_user_client_key
+  ON transactions(user_id, client_key) WHERE client_key IS NOT NULL;
 CREATE TRIGGER trg_tx_updated BEFORE UPDATE ON transactions
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

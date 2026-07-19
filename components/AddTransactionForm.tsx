@@ -59,7 +59,7 @@ export default function AddTransactionForm({
   const [catFilter, setCatFilter] = useState("");
   // 気分（任意・1〜5 / ADR-036）：現運用フォーム「いまどんな気持ち？」の再現
   const [mood, setMood] = useState<number | null>(null);
-  // 冪等キー（二重入力防止 / ADR-039）：この入力に対し1つ。保存成功で作り直す
+  // 冪等キー（二重入力防止 / ADR-040）：この入力に対し1つ。保存成功で作り直す
   const keyRef = useRef<string | null>(null);
 
   const filteredCats = catFilter

@@ -158,7 +158,8 @@
   - 支払日の請求合計＝引落額を自動算出。消込は transfers（ADR-003）。
 - **理由**: クレカタブが最も手運用が重い箇所（締め日違いの入れ替え・二重入力）。1入力・全連動の本丸。
 - **影響範囲**: transactions, card_statements(closing/payment day), 各種ビュー。
-- **状態**: 有効
+- **状態**: 有効（2026-07-19注記: 実装は締め日情報を wallets に持ち請求サイクルを**都度算出**、消込は transfers の memo 締めキー方式。
+  `card_statements` テーブル自体は現状未使用＝要確認リスト参照）
 
 ## ADR-024 | 2026-05-31 | プリペイドは全て残高管理。チャージは資金移動
 - **決定**: ANA Pay / JAL Pay / PASMO / PayPay残高 等を type=prepaid のウォレットとして残高管理。
@@ -324,7 +325,7 @@
   `app/login/page.tsx`・`lib/queries.ts`・全APIルート。**必要env**: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / AUTH_SECRET /
   AUTH_OWNER_EMAIL（＋招待は AUTH_ALLOWED_EMAILS）。Google Cloud Console の承認済みリダイレクトURIに
   `https://<ドメイン>/api/auth/google/callback` を登録する。
-- **状態**: 有効（コードはデプロイ済み・本番有効化は env 設定待ち。ADR-032 のパスワード認証はフォールバックに降格）
+- **状態**: 有効・**本番有効化済み**（Vercel/App Runner とも env 設定済み・`AUTH_ALLOWED_EMAILS` による招待制で運用中。2026-07-19確認。ADR-032 のパスワード認証はフォールバックに降格）
 
 ## ADR-038 | 2026-07-05 | AWS移行を再開（ADR-031の撤去判断を更新）
 - **決定**: ユーザーの明示的な意向により AWS 移行（App Runner + RDS・ADR-028）を再開。
@@ -338,10 +339,51 @@
      ＋RDSパブリックエンドポイント（TLS・強パスワード・SG開放は通常時DB停止で緩和）。
   日常は**デフォルト停止運用**（App Runner pause＋RDS stop＝ストレージ代のみ）。詳細・ハマりどころは docs/aws-deployment.md 6.4。
 
-## 要確認リスト（予実・サマリー由来 — 潰し込み中）
-- ビジョン/目標レイヤー（30歳目標・2026やりたいこと・非金額KPI=読書50冊/旅行2回・美容120万）をアプリに入れるか、当面はコンテキスト止まりか ← 次キャプチャ以降で判断
+## ADR-039 | 2026-07-07 | 給与明細OCR（Gemini）＋サイトメタデータ整備
+- **決定**:
+  1. **給与明細OCR**: 給与明細の編集画面に「📷 画像から自動入力」を追加。画像をクライアント側で縮小（最大1600px JPEG）→
+     `/api/payslips/ocr` → **Gemini API**（`GEMINI_API_KEY`・Google AI Studio無料キー、モデルは `GEMINI_MODEL` で変更可・既定 gemini-2.5-flash）で
+     支給/控除の内訳・労働時間をJSON抽出→フォームに流し込む。**キー未設定の間はボタン非表示＆API 400**（認証と同じ「envで有効化」方式）。
+     画像はDBに保存しない（読み取り結果のみ利用）。読み取り結果は必ず人間が確認してから保存する運用。
+  2. **メタデータ**: favicon（🌱ブランドタイルのSVG・`app/icon.svg`）、OGP、タイトルテンプレートを整備。
+     個人の家計アプリのため **robots は noindex**。
+- **理由**: 現運用の「給与明細OCR＋手入力」（master-data記載）の再現。roadmapのP3項目。
+- **影響範囲**: `app/api/payslips/ocr/route.ts`（新規）・`components/PayslipForm.tsx`・`app/payslips/[period]/edit/page.tsx`・
+  `app/icon.svg`（新規）・`app/layout.tsx`。**有効化に必要なenv**: `GEMINI_API_KEY`（Vercel/App Runnerに設定）。
+- **状態**: 有効（コード完成・キー設定待ち）
 
-## 要確認リスト（残: ごく軽微・seed作成前）
-- `食費合計`（日次）＝`食費(1人)`（月次）の同一性 ← ほぼ確定見込み
+## ADR-040 | 2026-07-19 | 取引の冪等キー（client_key）で二重入力を防止
+- **決定**: `transactions.client_key text` を追加し、部分ユニーク索引
+  `uq_tx_user_client_key(user_id, client_key) WHERE client_key IS NOT NULL` を張る。
+  - 入力フォームは1回の入力につき `crypto.randomUUID()` を1つ生成して送信（保存成功で作り直し。編集時は送らない）。
+  - APIは同一 client_key の既存取引があれば**新規作成せず既存IDを返す**（`duplicate:true`）。
+    同時実行でユニーク違反(23505)になった場合も同様に既存を返す＝3層（クライアント/API/DB）で冪等。
+  - DDLはオートマイグレーション（ADR-035）＋正式控え `db/migrations/003_client_key.sql`・`db/schema.sql`。
+- **理由**: 保存ボタン連打・通信リトライ・戻る→再送信での二重計上を、UIのdisabledだけに頼らずDBレベルで確実に防ぐため。
+- **影響範囲**: `lib/db.ts`・`db/schema.sql`・`db/migrations/003_client_key.sql`・
+  `app/api/transactions/route.ts`・`components/AddTransactionForm.tsx`。
+- **状態**: 有効。※コミット 2ec4c2f のメッセージは「ADR-039」表記だが、並行作業のOCR（ADR-039）と番号が衝突したため本エントリで **ADR-040 に繰り下げ**。
+
+## ADR-041 | 2026-07-19 | 分析ページ（/analytics）＝月次比較とビジュアル化
+- **決定**: `/analytics`（ナビ「分析🧮」）を新設。
+  ①今月 vs 直近平均（収入/支出/黒字の3カード。差額と%、データのある過去月のみで平均）
+  ②直近12ヶ月の収入・支出（棒）＋黒字（折れ線）の複合チャート
+  ③支出カテゴリ今月トップ8の前月比。
+  チャートはライブラリ非依存のインラインSVG（`/assets`・`/year` と同方式）で「Fresh Ledger」配色（ADR-033）に統一。
+- **理由**: ユーザー要望「他の月との比較・ビジュアル的な表現」。依存追加ゼロで軽量・テーマ一貫・学習しやすい。
+- **影響範囲**: `app/analytics/page.tsx`（新規）・`lib/queries.ts`（getMonthlySeries/getCategoryMoM）・`components/TopNav.tsx`。
+- **状態**: 有効。※コミット 4578da9 のメッセージは「ADR-040」表記（上記と同じ番号衝突。本エントリで **ADR-041 に繰り下げ**）。
+
+## 要確認リスト（クローズ済み・2026-07-19棚卸し）
+- ビジョン/目標レイヤー → ✅ `/vision`（自由記述の箱・vision_notes）として実装済み。予実/資産目標との数値連動は将来検討（roadmap）。
+- `食費合計`（日次）＝`食費(1人)`（月次）の同一性 → ✅ seedで同一カテゴリ体系に統合済み。
+- ADR-024/025 の🔶（管理するプリペイド/ポイントの最終リスト） → ✅ seedで確定（プリペイド7種：PayPay残高/ANA Pay/JAL Pay/PASMO/ICOCA/VポイントPay/メルペイ、ポイント3種：Ponta/d/PayPayポイント(自動運用)）。
 - ＜確定済＞ Q1=excluded / Q2=KPI管理 / Q3=ウォレット5種 / Q4=マスタ+終了年月 / Q5=自動集計
   / カード支払日=翌月 / 交際費=食費グループ / 用語(ADR-013) / 投資(ADR-014) / 現金(ADR-015)
+
+## 要確認リスト（オープン・2026-07-19棚卸し）
+- **card_statements テーブルが未使用**: 請求サイクルは都度算出（/cards）・消込は transfers の memo 締めキー方式で実装したため、
+  ADR-003/023 が想定した statement 行・paid フラグは使っていない。将来の厳密消込に使うか、スキーマから撤去するか要判断。
+- **FY開始月の設定UI が無い**（ADR-017）: DB列（users.fiscal_year_start_month）と集計は対応済みだが、変更UIは未実装。当面はDB直更新で可。
+- ~~本番(Vercel)の認証有効化の確認~~ → ✅ クローズ（2026-07-19 ユーザー確認：Vercel も Google ログイン有効化済み・`AUTH_ALLOWED_EMAILS` で招待制運用中）
+- **OCRの有効化**: コード完成（ADR-039）。`GEMINI_API_KEY` 設定待ち（設定までボタン非表示＝安全側）。

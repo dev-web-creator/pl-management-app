@@ -2,32 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NAV_ITEMS } from "@/lib/nav";
 
-const NAV = [
-  { href: "/", label: "概要", emoji: "📊" },
-  { href: "/calendar", label: "カレンダー", emoji: "📅" },
-  { href: "/transactions", label: "取引", emoji: "📒" },
-  { href: "/transfers", label: "振替", emoji: "🔄" },
-  { href: "/fixed-costs", label: "固定費", emoji: "📌" },
-  { href: "/payslips", label: "給与", emoji: "💰" },
-  { href: "/cards", label: "カード", emoji: "💳" },
-  { href: "/assets", label: "資産", emoji: "🐷" },
-  { href: "/budget", label: "予実", emoji: "🎯" },
-  { href: "/weekly", label: "週次", emoji: "📆" },
-  { href: "/year", label: "年次", emoji: "📈" },
-  { href: "/analytics", label: "分析", emoji: "🧮" },
-  { href: "/forecast", label: "5か年", emoji: "🔮" },
-  { href: "/vision", label: "目標", emoji: "🌟" },
-  { href: "/settings", label: "設定", emoji: "⚙️" },
-];
-
-export default function TopNav({ username }: { username: string | null }) {
+export default function TopNav({
+  username,
+  hidden = [],
+}: {
+  username: string | null;
+  hidden?: string[];
+}) {
   const pathname = usePathname() || "/";
   // ログイン画面ではナビを出さない
   if (pathname === "/login") return null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+
+  // 非表示設定（ADR-046）。閲覧中のページは設定に関わらず出す（迷子防止）
+  const items = NAV_ITEMS.filter((n) => n.always || !hidden.includes(n.href) || isActive(n.href));
 
   return (
     <nav className="nav">
@@ -39,20 +31,19 @@ export default function TopNav({ username }: { username: string | null }) {
       </Link>
 
       <div className="nav-links">
-        {NAV.map((n) => (
-          <Link key={n.href} href={n.href} className={isActive(n.href) ? "active" : ""}>
+        {items.map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            title={n.href === "/inspect" ? "DBインスペクター" : undefined}
+            className={isActive(n.href) ? "active" : ""}
+          >
             <span className="deco" aria-hidden="true">
               {n.emoji}
             </span>
             {n.label}
           </Link>
         ))}
-        <Link href="/inspect" title="DBインスペクター" className={isActive("/inspect") ? "active" : ""}>
-          <span className="deco" aria-hidden="true">
-            🔍
-          </span>
-          DB
-        </Link>
       </div>
 
       {username && (

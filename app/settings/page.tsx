@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { notifyEnabled } from "@/lib/notify";
 import FySettingForm from "@/components/FySettingForm";
 import NotificationRulesPanel from "@/components/NotificationRulesPanel";
+import FeatureTogglePanel from "@/components/FeatureTogglePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,12 @@ export default async function SettingsPage() {
           <h1 className="text-xl font-bold">⚙️ 設定</h1>
           <Link href="/" className="text-xs text-sky-600 hover:underline">← ダッシュボード</Link>
         </header>
+
+        {/* 機能の表示ON/OFF（ADR-046） */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-500 mb-3">🧩 機能の表示（使わないページをナビから隠す）</h2>
+          <FeatureTogglePanel hidden={settings.hidden_pages} />
+        </section>
 
         {/* FY開始月（ADR-017） */}
         <section className="bg-white rounded-2xl shadow-sm p-5">

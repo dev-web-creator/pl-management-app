@@ -49,7 +49,7 @@ flowchart TD
 | `/weekly` | 週次進捗（ADR-036） | 週×変動費グループの自動ロールアップ（直近12週） |
 | `/analytics` | 分析（ADR-041） | 今月vs直近平均・12ヶ月推移チャート・カテゴリ前月比 |
 | `/forecast` | 5か年PL（ADR-044） | 60ヶ月の実績＋見込み・FYサマリ・純資産予測ライン |
-| `/settings` | 設定（ADR-017/042） | FY開始月の変更、メール通知ルールの追加/ON・OFF/削除、送信履歴 |
+| `/settings` | 設定（ADR-017/042/046） | 機能の表示ON/OFF、FY開始月の変更、メール通知ルールの追加/ON・OFF/削除、送信履歴 |
 | `/vision` | ビジョン/目標 | 自由記述の箱 |
 | `/inspect` | DBインスペクター | 全テーブル閲覧（本番は `INSPECT_KEY` ＋ `?key=`） |
 | `/login` | ログイン（ADR-032） | ユーザー名/パスワード入力→セッションCookie発行。認証無効時は `/` へ |
@@ -76,7 +76,7 @@ flowchart TD
 | `POST /api/cards/settle` | クレカ請求サイクルの引き落とし消込 |
 | `POST /api/vision` | ビジョン/目標の自由記述をupsert |
 | `POST /api/payslips/ocr` | 給与明細画像をGeminiで読み取り（`GEMINI_API_KEY` 設定時のみ / ADR-039） |
-| `PUT /api/settings` | ユーザー設定（FY開始月）を更新（ADR-017） |
+| `PUT /api/settings` | ユーザー設定（FY開始月・機能の表示ON/OFF）を部分更新（ADR-017/046） |
 | `POST /api/notification-rules` | 通知ルール（変動費しきい値）を追加（ADR-042） |
 | `PUT /api/notification-rules/[id]` | 通知ルールの ON/OFF |
 | `DELETE /api/notification-rules/[id]` | 通知ルール削除（送信履歴もCASCADE） |

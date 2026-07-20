@@ -57,6 +57,9 @@ UPDATE users SET notif_defaults_seeded = true WHERE NOT notif_defaults_seeded;
 ALTER TABLE wallets DROP CONSTRAINT IF EXISTS wallets_type_check;
 ALTER TABLE wallets ADD CONSTRAINT wallets_type_check
   CHECK (type IN ('bank','credit_card','prepaid','points','cash','crypto'));
+-- 機能の表示ON/OFF（ADR-046）: 非表示にしたページのhref配列
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS hidden_pages jsonb NOT NULL DEFAULT '[]'::jsonb;
 `;
 
 let migrated: Promise<void> | null = null;

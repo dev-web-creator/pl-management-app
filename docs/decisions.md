@@ -442,6 +442,19 @@
 - **影響範囲**: `db/import/gen_import.py`・`db/import/validate.py`（新規・コードのみ）・`data/import-sheet-fy1-fy3.sql`（git外）・categories に取込用6件追加（脱毛(プラム)/ChatGPTプラス/しがく会費/Amazon Prime/テレ東BIZ/(取込)食費一括※入力不可）。
 - **状態**: ローカル取込完了・**本番はカットオフ月の確認待ち**
 
+## ADR-046 | 2026-07-20 | 機能の表示ON/OFF（設定画面からナビをカスタマイズ）
+- **決定**: ユーザーごとに「使わないページ」をナビゲーションから隠せるようにする。
+  1. `users.hidden_pages jsonb`（非表示にしたページのhref配列）を追加。マルチユーザー（ADR-037）前提でユーザー単位の設定。
+  2. ナビ定義を `lib/nav.ts` に一元化（TopNavと設定画面で共有）。「概要」「設定」は `always=true` で非表示不可。
+  3. `/settings` の最上部に「🧩 機能の表示」パネル：タップでON/OFF→保存（`PUT /api/settings` の部分更新に統合）。
+     APIは許可リスト（HIDEABLE_HREFS）で検証し不正なhrefを拒否。
+  4. **隠すのはナビ表示のみ**（URL直打ちは可・データ無影響）。閲覧中のページは設定に関わらずナビに出す（迷子防止）。
+- **理由**: ユーザー要望「人によって使う項目と使わない項目があるので設定で分けたい」。招待ユーザー（ADR-037）にも各自の設定が効く。
+- **影響範囲**: `lib/nav.ts`（新規）・`components/TopNav.tsx`（NAV定義を移設・hidden対応）・`components/FeatureTogglePanel.tsx`（新規）・
+  `app/settings/page.tsx`・`app/api/settings/route.ts`（部分更新化）・`app/layout.tsx`（hidden_pages取得）・`lib/queries.ts`・
+  `db/schema.sql`・`db/migrations/006_hidden_pages.sql`・オートマイグレーション。
+- **状態**: 有効（ローカルでOFF→ナビ消滅・不正href拒否・復元まで検証済み）
+
 ## 要確認リスト（クローズ済み・2026-07-19棚卸し）
 - ビジョン/目標レイヤー → ✅ `/vision`（自由記述の箱・vision_notes）として実装済み。予実/資産目標との数値連動は将来検討（roadmap）。
 - `食費合計`（日次）＝`食費(1人)`（月次）の同一性 → ✅ seedで同一カテゴリ体系に統合済み。

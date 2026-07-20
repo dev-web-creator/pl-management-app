@@ -3,6 +3,7 @@ import { Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
 import { getSessionUser } from "@/lib/auth";
+import { getHiddenPages } from "@/lib/queries";
 
 // 丸ゴシックで sumika の「Warm Kakeibo」の温かさを再現
 const zenMaru = Zen_Maru_Gothic({
@@ -33,11 +34,11 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const username = await getSessionUser();
+  const [username, hidden] = await Promise.all([getSessionUser(), getHiddenPages()]);
   return (
     <html lang="ja" className={zenMaru.variable}>
       <body>
-        <TopNav username={username} />
+        <TopNav username={username} hidden={hidden} />
         {children}
       </body>
     </html>

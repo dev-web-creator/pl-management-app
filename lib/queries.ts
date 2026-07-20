@@ -98,16 +98,31 @@ export async function getCategoryMoM(period: string): Promise<CategoryMoM[]> {
   return rows;
 }
 
-// ---- 設定・通知（ADR-042 / ADR-017） ----
-export type UserSettings = { email: string | null; fiscal_year_start_month: number };
+// ---- 設定・通知（ADR-042 / ADR-017 / ADR-046） ----
+export type UserSettings = {
+  email: string | null;
+  fiscal_year_start_month: number;
+  hidden_pages: string[];
+};
 
 export async function getUserSettings(): Promise<UserSettings> {
   await ensureMigrated();
   const { rows } = await pool.query(
-    `SELECT email, fiscal_year_start_month FROM users WHERE id=$1`,
+    `SELECT email, fiscal_year_start_month, hidden_pages FROM users WHERE id=$1`,
     [await uid()]
   );
-  return rows[0] ?? { email: null, fiscal_year_start_month: 4 };
+  return rows[0] ?? { email: null, fiscal_year_start_month: 4, hidden_pages: [] };
+}
+
+// ナビ用の非表示ページ一覧（layoutから毎リクエスト呼ばれるため失敗しても落とさない）
+export async function getHiddenPages(): Promise<string[]> {
+  try {
+    await ensureMigrated();
+    const { rows } = await pool.query(`SELECT hidden_pages FROM users WHERE id=$1`, [await uid()]);
+    return Array.isArray(rows[0]?.hidden_pages) ? rows[0].hidden_pages : [];
+  } catch {
+    return [];
+  }
 }
 
 export type NotificationRule = { id: number; kind: string; threshold: number; enabled: boolean };

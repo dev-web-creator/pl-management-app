@@ -36,6 +36,7 @@ CREATE TABLE users (
   fiscal_year_start_month  smallint NOT NULL DEFAULT 4
                              CHECK (fiscal_year_start_month BETWEEN 1 AND 12), -- FY開始月(可変/ADR-017)
   notif_defaults_seeded    boolean NOT NULL DEFAULT false, -- 既定通知ルール投入済みフラグ(ADR-042)
+  hidden_pages             jsonb NOT NULL DEFAULT '[]'::jsonb, -- ナビから隠すページのhref配列(ADR-046)
   created_at               timestamptz NOT NULL DEFAULT now(),
   updated_at               timestamptz NOT NULL DEFAULT now()
 );

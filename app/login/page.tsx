@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { authEnabled, googleEnabled, getSession } from "@/lib/auth";
 
@@ -63,6 +64,12 @@ export default async function LoginPage({
             <button type="submit">ログイン</button>
           </form>
         )}
+
+        <div className="flex items-center justify-center gap-3 text-[11px] text-[var(--muted)] mt-1">
+          <Link href="/legal/terms" className="hover:underline">利用規約</Link>
+          <span>·</span>
+          <Link href="/legal/privacy" className="hover:underline">プライバシーポリシー</Link>
+        </div>
       </div>
     </main>
   );

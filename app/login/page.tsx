@@ -51,7 +51,14 @@ export default async function LoginPage({
             </svg>
             Googleでログイン
           </a>
-        ) : (
+        ) : null}
+        {google && (
+          <p className="text-[11px] text-[var(--muted)] m-0 text-center">
+            ログイン／登録により<Link href="/legal/terms" className="underline">利用規約</Link>・
+            <Link href="/legal/privacy" className="underline">プライバシーポリシー</Link>に同意したものとみなします。
+          </p>
+        )}
+        {!google && (
           <form method="POST" action="/api/auth/login" className="flex flex-col gap-4 m-0">
             <label>
               ユーザー名
@@ -64,12 +71,13 @@ export default async function LoginPage({
             <button type="submit">ログイン</button>
           </form>
         )}
-
-        <div className="flex items-center justify-center gap-3 text-[11px] text-[var(--muted)] mt-1">
-          <Link href="/legal/terms" className="hover:underline">利用規約</Link>
-          <span>·</span>
-          <Link href="/legal/privacy" className="hover:underline">プライバシーポリシー</Link>
-        </div>
+        {!google && (
+          <div className="flex items-center justify-center gap-3 text-[11px] text-[var(--muted)] mt-1">
+            <Link href="/legal/terms" className="hover:underline">利用規約</Link>
+            <span>·</span>
+            <Link href="/legal/privacy" className="hover:underline">プライバシーポリシー</Link>
+          </div>
+        )}
       </div>
     </main>
   );

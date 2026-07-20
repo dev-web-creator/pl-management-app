@@ -4,7 +4,8 @@
 //  1. Googleログイン: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / AUTH_SECRET が揃うと有効。
 //     ログイン画面は「Googleでログイン」のみになる（パスワード入力なし）。
 //     入場許可 = users.email に登録済み or AUTH_ALLOWED_EMAILS（カンマ区切り）に含まれる
-//     （後者は初回ログイン時に初期データつきでユーザー自動作成）。
+//     or AUTH_OPEN_SIGNUP=true（誰でもセルフサインアップ可・ADR-053）。
+//     新規は初回ログイン時に初期データつきでユーザー自動作成。
 //  2. パスワードログイン: AUTH_USER / AUTH_PASSWORD / AUTH_SECRET（Google未設定時のフォールバック）。
 //  3. どちらも未設定なら認証オフ（ローカル開発・env設定前の本番を止めない）。
 //

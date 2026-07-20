@@ -66,8 +66,8 @@ export async function GET(req: Request) {
   // 許可判定：
   //  1. AUTH_OWNER_EMAIL と一致 → オーナー(user 1)として入場（初回は users.email を書き換えて紐付け）
   //  2. users.email に登録済み → そのまま入場
-  //  3. AUTH_ALLOWED_EMAILS に含まれる → 初期データつきでユーザー自動作成
-  //  4. どれでもない → 拒否
+  //  3. 新規メール → AUTH_OPEN_SIGNUP=true なら誰でも / でなければ AUTH_ALLOWED_EMAILS 招待制。
+  //     どちらかを満たせば初期データつきでユーザー自動作成、満たさなければ拒否
   let userId: number;
   const ownerEmail = (process.env.AUTH_OWNER_EMAIL ?? "").trim().toLowerCase();
   const existing = await pool.query(`SELECT id FROM users WHERE lower(email)=$1`, [email]);
@@ -82,11 +82,12 @@ export async function GET(req: Request) {
   } else if (existing.rowCount) {
     userId = existing.rows[0].id;
   } else {
+    const openSignup = (process.env.AUTH_OPEN_SIGNUP ?? "").trim().toLowerCase() === "true";
     const allowed = (process.env.AUTH_ALLOWED_EMAILS ?? "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
-    if (!allowed.includes(email)) return fail("denied");
+    if (!openSignup && !allowed.includes(email)) return fail("denied");
     userId = await provisionUser(email, payload.name);
   }
 

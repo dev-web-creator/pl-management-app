@@ -16,3 +16,7 @@ npm-debug.log*
 
 .vercel
 .env*
+
+# 実データ（スプレッドシート取込SQL等の個人情報。Gitに含めない）
+data/
+tsconfig.tsbuildinfo

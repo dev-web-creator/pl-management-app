@@ -10,7 +10,9 @@ from datetime import date, timedelta
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 XLSX = os.path.expandvars(r'%TEMP%\claude\sheet.xlsx')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'import.sql')
-CUTOFF = '2026-07-01'
+# 本番アプリに実データ未投入のため全期間取込（2026-07-20確定）。並走運用中はシートが正＝
+# シート更新後に再生成→再実行すれば冪等キーで差分だけ追加される
+CUTOFF = '2027-04-01'
 
 wb = openpyxl.load_workbook(XLSX, read_only=True, data_only=True)
 
@@ -132,10 +134,11 @@ for name, pl, parent, allowed in NEW_CATEGORIES:
         f"INSERT INTO categories (user_id, parent_id, name, pl_type, is_input_allowed, display_order)\n"
         f"SELECT 1, {p}, '{esc(name)}', '{pl}', {str(allowed).lower()}, 900\n"
         f"WHERE NOT EXISTS (SELECT 1 FROM categories WHERE user_id=1 AND name='{esc(name)}');")
-# XRPウォレット（無ければ）
-sql.append("INSERT INTO wallets (user_id, name, type, display_order)\n"
-           "SELECT 1, 'bitFlyer XRP', 'crypto', 102\n"
-           "WHERE NOT EXISTS (SELECT 1 FROM wallets WHERE user_id=1 AND name='bitFlyer XRP');")
+# 暗号資産ウォレット（無ければ作成。本番はseed未適用のため3種とも）
+for i, coin in enumerate(['bitFlyer ETH', 'bitFlyer BTC', 'bitFlyer XRP']):
+    sql.append(f"INSERT INTO wallets (user_id, name, type, display_order)\n"
+               f"SELECT 1, '{coin}', 'crypto', {100 + i}\n"
+               f"WHERE NOT EXISTS (SELECT 1 FROM wallets WHERE user_id=1 AND name='{coin}');")
 # 過去データ用ウォレットは作らない（脚なしインポート）
 
 def tx(dt, cat, amount, memo, ckey, txtype='expense'):

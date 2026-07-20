@@ -20,3 +20,4 @@ npm-debug.log*
 # 実データ（スプレッドシート取込SQL等の個人情報。Gitに含めない）
 data/
 tsconfig.tsbuildinfo
+db/import/import.sql

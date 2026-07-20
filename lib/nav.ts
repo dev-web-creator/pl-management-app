@@ -3,7 +3,7 @@
 export type NavItem = { href: string; label: string; emoji: string; always?: boolean };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "概要", emoji: "📊", always: true },
+  { href: "/", label: "サマリ", emoji: "📊", always: true },
   { href: "/calendar", label: "カレンダー", emoji: "📅" },
   { href: "/transactions", label: "取引", emoji: "📒" },
   { href: "/transfers", label: "振替", emoji: "🔄" },

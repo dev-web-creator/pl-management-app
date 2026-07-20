@@ -71,6 +71,32 @@ export default async function SettingsPage() {
           </p>
         </section>
 
+        {/* データのエクスポート（ADR-053） */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-500 mb-3">💾 データのエクスポート</h2>
+          <div className="space-y-2">
+            <a
+              href="/api/export/transactions"
+              download
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>📄 取引をCSVで書き出し（Excelで開けます）</span>
+              <span className="text-slate-400">↓</span>
+            </a>
+            <a
+              href="/api/export/all"
+              download
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>🗄️ 全データをJSONで書き出し（バックアップ用）</span>
+              <span className="text-slate-400">↓</span>
+            </a>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            あなたのデータはいつでも取り出せます。CSVは家計の分析やExcelでの加工に、JSONは全項目のバックアップに。
+          </p>
+        </section>
+
         {/* 使い方ガイド */}
         <Link
           href="/guide"
@@ -79,6 +105,13 @@ export default async function SettingsPage() {
           <span className="text-sm font-semibold text-slate-600">📖 使い方ガイド</span>
           <span className="block text-[11px] text-slate-400 mt-1">初期設定から毎月の運用・振り返りまでの流れ</span>
         </Link>
+
+        {/* 規約・プライバシー */}
+        <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400">
+          <Link href="/legal/terms" className="hover:underline">利用規約</Link>
+          <span>·</span>
+          <Link href="/legal/privacy" className="hover:underline">プライバシーポリシー</Link>
+        </div>
 
         {/* FY開始月（ADR-017） */}
         <section className="bg-white rounded-2xl shadow-sm p-5">

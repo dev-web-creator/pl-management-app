@@ -283,6 +283,35 @@ export async function getInputCategories(): Promise<InputCategory[]> {
   return rows;
 }
 
+export type CategoryManageRow = {
+  id: number;
+  parent_id: number | null;
+  name: string;
+  pl_type: string;
+  is_input_allowed: boolean;
+  is_active: boolean;
+  parent_name: string | null;
+  child_count: number;
+  tx_count: number; // この費目を使う取引数（削除可否の判定）
+};
+
+// カテゴリ管理画面用（ツリー＋使用数 / ADR-050）
+export async function getCategoriesForManagement(): Promise<CategoryManageRow[]> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `SELECT c.id, c.parent_id, c.name, c.pl_type, c.is_input_allowed, c.is_active,
+            p.name AS parent_name,
+            (SELECT COUNT(*) FROM categories ch WHERE ch.parent_id=c.id) AS child_count,
+            (SELECT COUNT(*) FROM transactions t WHERE t.category_id=c.id) AS tx_count
+     FROM categories c
+     LEFT JOIN categories p ON p.id=c.parent_id
+     WHERE c.user_id=$1
+     ORDER BY c.pl_type, COALESCE(c.parent_id, c.id), c.parent_id NULLS FIRST, c.display_order, c.id`,
+    [await uid()]
+  );
+  return rows.map((r) => ({ ...r, child_count: Number(r.child_count), tx_count: Number(r.tx_count) }));
+}
+
 export type WalletOption = { id: number; name: string; type: string };
 
 // ウォレット一覧。決済手段プルダウン用。

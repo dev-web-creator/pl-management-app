@@ -45,6 +45,13 @@ export default async function SettingsPage() {
               <span className="text-slate-400">›</span>
             </Link>
             <Link
+              href="/categories"
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>🗂️ 費目（カテゴリ）の追加・改名</span>
+              <span className="text-slate-400">›</span>
+            </Link>
+            <Link
               href="/fixed-costs"
               className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
             >

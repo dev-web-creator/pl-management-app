@@ -7,9 +7,11 @@ import { NAV_ITEMS } from "@/lib/nav";
 export default function TopNav({
   username,
   hidden = [],
+  isOwner = true,
 }: {
   username: string | null;
   hidden?: string[];
+  isOwner?: boolean; // /inspect はオーナーのみ（ADR-052）
 }) {
   const pathname = usePathname() || "/";
   // ログイン画面ではナビを出さない
@@ -19,7 +21,12 @@ export default function TopNav({
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 
   // 非表示設定（ADR-046）。閲覧中のページは設定に関わらず出す（迷子防止）
-  const items = NAV_ITEMS.filter((n) => n.always || !hidden.includes(n.href) || isActive(n.href));
+  // /inspect はオーナー専用なので他ユーザーには出さない（ADR-052）
+  const items = NAV_ITEMS.filter(
+    (n) =>
+      (n.href !== "/inspect" || isOwner) &&
+      (n.always || !hidden.includes(n.href) || isActive(n.href))
+  );
 
   return (
     <nav className="nav">

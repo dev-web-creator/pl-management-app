@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listTables, getTableDump } from "@/lib/queries";
-import { requireAuth, authEnabled } from "@/lib/auth";
+import { requireAuth, authEnabled, currentUserId } from "@/lib/auth";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic"; // 毎回DBの最新を見る
 
@@ -41,9 +42,14 @@ export default async function Inspect({
   searchParams: Promise<{ key?: string }>;
 }) {
   await requireAuth();
-  // 保護の考え方（ADR-029→037で更新）:
-  //  - 認証が有効ならログイン自体が鍵（requireAuth を通過した時点で閲覧可・INSPECT_KEY不要）
-  //  - 認証が無効な本番は旧来どおり INSPECT_KEY ＋ ?key= 一致が必須（安全側に倒してロック）
+  // 【重要・ADR-052】DBインスペクターは全テーブルを user_id で絞らず表示する学習用ツール。
+  // マルチユーザー環境では他人のデータが見えてしまうため、オーナー（user 1）以外は 404 にする。
+  // （認証無効なローカル開発では currentUserId()=1 なので従来どおり閲覧可）
+  if ((await currentUserId()) !== 1) notFound();
+  // 保護の考え方（ADR-029→037→052で更新）:
+  //  - オーナー限定（上のガード）。さらに:
+  //  - 認証が有効ならログイン自体が鍵（INSPECT_KEY不要）
+  //  - 認証が無効な本番は INSPECT_KEY ＋ ?key= 一致が必須（安全側に倒してロック）
   //  - ローカル開発(development)は常に閲覧可
   const { key } = await searchParams;
   const expected = process.env.INSPECT_KEY;

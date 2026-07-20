@@ -296,6 +296,61 @@ export async function getWalletOptions(): Promise<WalletOption[]> {
   return rows;
 }
 
+export type WalletManageRow = {
+  id: number;
+  name: string;
+  type: string;
+  initial_balance: number;
+  include_in_assets: boolean;
+  is_balance_tracked: boolean;
+  is_active: boolean;
+  closing_day: number | null;
+  closing_eom: boolean;
+  payment_day: number | null;
+  payment_eom: boolean;
+  payment_month_offset: number;
+  settlement_wallet_id: number | null;
+  settlement_name: string | null;
+  balance: number; // 現在残高（cryptoは最新スナップショット）
+  in_use: boolean; // 取引等から参照されているか（削除=無効化になる）
+};
+
+// ウォレット管理画面用（全フィールド＋現在残高＋参照有無 / ADR-048）
+export async function getWalletsForManagement(): Promise<WalletManageRow[]> {
+  await ensureMigrated();
+  const { rows } = await pool.query(
+    `WITH legs AS (
+       SELECT tl.wallet_id, SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END) AS d,
+              COUNT(*) AS n
+       FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
+       WHERE t.user_id=$1 GROUP BY tl.wallet_id
+     ),
+     tr_in  AS (SELECT to_wallet_id   AS wid, SUM(amount)     AS a, COUNT(*) AS n FROM transfers WHERE user_id=$1 GROUP BY to_wallet_id),
+     tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a, COUNT(*) AS n FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id)
+     SELECT w.id, w.name, w.type, w.initial_balance, w.include_in_assets, w.is_balance_tracked, w.is_active,
+            w.closing_day, w.closing_eom, w.payment_day, w.payment_eom, w.payment_month_offset,
+            w.settlement_wallet_id, sw.name AS settlement_name,
+            (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+                  ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END)::int AS balance,
+            (COALESCE(legs.n,0) + COALESCE(tr_in.n,0) + COALESCE(tr_out.n,0)
+             + (SELECT COUNT(*) FROM recurring_rules r WHERE r.settlement_wallet_id=w.id)
+             + (SELECT COUNT(*) FROM card_statements cst WHERE cst.wallet_id=w.id)
+             + (SELECT COUNT(*) FROM wallets w2 WHERE w2.settlement_wallet_id=w.id)) > 0 AS in_use
+     FROM wallets w
+     LEFT JOIN wallets sw ON sw.id = w.settlement_wallet_id
+     LEFT JOIN legs   ON legs.wallet_id = w.id
+     LEFT JOIN tr_in  ON tr_in.wid  = w.id
+     LEFT JOIN tr_out ON tr_out.wid = w.id
+     LEFT JOIN LATERAL (
+       SELECT actual_balance FROM balance_snapshots s WHERE s.wallet_id=w.id ORDER BY as_of_date DESC LIMIT 1
+     ) cs ON w.type='crypto'
+     WHERE w.user_id=$1
+     ORDER BY w.is_active DESC, w.display_order, w.id`,
+    [await uid()]
+  );
+  return rows;
+}
+
 // ---- DBインスペクター用（学習目的：テーブルの中身をそのまま見る） ----
 export async function listTables(): Promise<string[]> {
   const { rows } = await pool.query(

@@ -38,6 +38,13 @@ export default async function SettingsPage() {
           <h2 className="text-sm font-semibold text-slate-500 mb-3">🔧 マスタ管理</h2>
           <div className="space-y-2">
             <Link
+              href="/wallets"
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>🏦 口座・カード・電子マネー（決済手段の登録）</span>
+              <span className="text-slate-400">›</span>
+            </Link>
+            <Link
               href="/fixed-costs"
               className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
             >

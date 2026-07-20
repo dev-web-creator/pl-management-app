@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PayslipEdit, PayslipItemRow } from "@/lib/queries";
+import type { PayslipEdit, PayslipItemRow, WalletOption } from "@/lib/queries";
 
 const yen = (n: number) => "¥" + n.toLocaleString("ja-JP");
 
@@ -31,14 +31,19 @@ const seed = (names: string[]): PayslipItemRow[] => names.map((name) => ({ name,
 export default function PayslipForm({
   initial,
   ocrEnabled,
+  banks = [],
 }: {
   initial: PayslipEdit;
   ocrEnabled?: boolean; // GEMINI_API_KEY 設定時のみ true（ADR-039）
+  banks?: WalletOption[]; // 手取りの振込先候補（銀行/プリペイド / ADR-049）
 }) {
   const router = useRouter();
   const [workHours, setWorkHours] = useState(initial.total_work_hours);
   const [overtime, setOvertime] = useState(initial.overtime_hours);
   const [confirmed, setConfirmed] = useState(initial.is_confirmed);
+  const [salaryWalletId, setSalaryWalletId] = useState<number | null>(
+    initial.salary_wallet_id ?? banks[0]?.id ?? null
+  );
   const [allowances, setAllowances] = useState<PayslipItemRow[]>(
     initial.allowances.length ? initial.allowances : seed(DEFAULT_ALLOWANCES)
   );
@@ -141,6 +146,7 @@ export default function PayslipForm({
           is_confirmed: confirmed,
           allowances,
           deductions,
+          salary_wallet_id: salaryWalletId,
         }),
       });
       const d = await res.json();
@@ -260,6 +266,26 @@ export default function PayslipForm({
           <div className="flex justify-between text-xs text-slate-400"><span>時給換算（総支給÷総労働時間）</span><span className="tabular-nums">{yen(hourly)} / h</span></div>
         )}
       </div>
+
+      {/* 手取りの振込先（月次「給与収入(手取り)」に自動連動 / ADR-049） */}
+      {banks.length > 0 && (
+        <div className="bg-emerald-50/60 rounded-xl p-3 text-sm">
+          <label className="text-xs text-slate-500">手取りの振込先（この口座に給与が入る想定）</label>
+          <select
+            value={salaryWalletId ?? ""}
+            onChange={(e) => setSalaryWalletId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full mt-1 border rounded-lg px-2 py-2 text-sm bg-white"
+          >
+            {banks.map((w) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-400 mt-1.5">
+            保存すると、手取り <b className="text-emerald-600">{yen(net)}</b> が月次（{initial.period}）の
+            「給与収入(手取り)」とこの口座残高に自動反映されます。
+          </p>
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm text-slate-500">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> 確定（確定/予定）

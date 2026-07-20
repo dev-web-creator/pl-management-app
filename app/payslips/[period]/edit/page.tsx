@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPayslipForEdit } from "@/lib/queries";
+import { getPayslipForEdit, getWalletOptions } from "@/lib/queries";
 import PayslipForm from "@/components/PayslipForm";
 import { requireAuth } from "@/lib/auth";
 
@@ -15,7 +15,8 @@ export default async function EditPayslipPage({
   const { period } = await params;
   if (!/^\d{4}-\d{2}$/.test(period)) notFound();
 
-  const data = await getPayslipForEdit(period);
+  const [data, wallets] = await Promise.all([getPayslipForEdit(period), getWalletOptions()]);
+  const banks = wallets.filter((w) => w.type === "bank" || w.type === "prepaid");
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900 px-4 py-6">
@@ -26,7 +27,7 @@ export default async function EditPayslipPage({
             ← 給与明細一覧
           </Link>
         </header>
-        <PayslipForm initial={data} ocrEnabled={!!process.env.GEMINI_API_KEY} />
+        <PayslipForm initial={data} ocrEnabled={!!process.env.GEMINI_API_KEY} banks={banks} />
       </div>
     </main>
   );

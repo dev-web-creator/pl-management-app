@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     is_confirmed?: boolean;
     allowances?: Item[];
     deductions?: Item[];
+    salary_wallet_id?: number | null; // 手取りの振込先（ADR-049）
   };
   try {
     b = await req.json();
@@ -70,8 +71,55 @@ export async function POST(req: Request) {
         [payslipId, d.name, d.amount]
       );
     }
+
+    // --- 手取りを月次「給与収入(手取り)」に自動連動（ADR-049）---
+    // 冪等キー payslip:<uid>:<period> の収入取引を作り直す（1入力・全連動）。
+    const net =
+      allowances.reduce((s, a) => s + a.amount, 0) - deductions.reduce((s, d) => s + d.amount, 0);
+    const salaryKey = `payslip:${USER_ID}:${period}`;
+    // 既存の連動取引を削除（脚はCASCADE）。手動入力の給与収入(別client_key)には触れない。
+    await client.query(`DELETE FROM transactions WHERE user_id=$1 AND client_key=$2`, [USER_ID, salaryKey]);
+
+    let salaryLinked = false;
+    if (net > 0) {
+      const cat = await client.query(
+        `SELECT id FROM categories WHERE user_id=$1 AND name='給与収入(手取り)' AND is_active LIMIT 1`,
+        [USER_ID]
+      );
+      // 振込先ウォレット（指定が自分の銀行/プリペイドか検証、無ければ先頭の銀行）
+      let walletId: number | null = null;
+      if (b.salary_wallet_id != null) {
+        const w = await client.query(
+          `SELECT id FROM wallets WHERE id=$1 AND user_id=$2 AND is_active AND type IN ('bank','prepaid')`,
+          [b.salary_wallet_id, USER_ID]
+        );
+        walletId = w.rows[0]?.id ?? null;
+      }
+      if (walletId == null) {
+        const fb = await client.query(
+          `SELECT id FROM wallets WHERE user_id=$1 AND is_active AND type='bank' ORDER BY display_order, id LIMIT 1`,
+          [USER_ID]
+        );
+        walletId = fb.rows[0]?.id ?? null;
+      }
+      if (cat.rowCount && cat.rowCount > 0) {
+        const tx = await client.query(
+          `INSERT INTO transactions (user_id, category_id, type, amount, accrual_date, memo, client_key)
+           VALUES ($1,$2,'income',$3,$4,'給与明細から自動連動（手取り）',$5) RETURNING id`,
+          [USER_ID, cat.rows[0].id, net, `${b.period}-25`, salaryKey]
+        );
+        if (walletId != null) {
+          await client.query(
+            `INSERT INTO transaction_legs (transaction_id, wallet_id, amount) VALUES ($1,$2,$3)`,
+            [tx.rows[0].id, walletId, net]
+          );
+        }
+        salaryLinked = true;
+      }
+    }
+
     await client.query("COMMIT");
-    return NextResponse.json({ ok: true, id: payslipId });
+    return NextResponse.json({ ok: true, id: payslipId, salary_linked: salaryLinked, net });
   } catch (e) {
     await client.query("ROLLBACK");
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "不明なエラー" }, { status: 500 });

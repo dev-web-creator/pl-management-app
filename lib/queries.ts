@@ -1175,18 +1175,35 @@ export type PayslipEdit = {
   is_confirmed: boolean;
   allowances: PayslipItemRow[];
   deductions: PayslipItemRow[];
+  salary_wallet_id: number | null; // 手取りの振込先（給与収入の連動先 / ADR-049）
 };
 
 // 指定月（'YYYY-MM'）の給与明細を編集用に取得。無ければ空を返す。
 export async function getPayslipForEdit(period: string): Promise<PayslipEdit> {
   const p = `${period}-01`;
+  const id = await uid();
   const ps = await pool.query(
     `SELECT id, total_work_hours, overtime_hours, is_confirmed
      FROM payslips WHERE user_id=$1 AND period=$2`,
-    [await uid(), p]
+    [id, p]
   );
+  // この月の給与連動取引（client_key=payslip:uid:period）の振込先を既定にする。無ければ先頭の銀行。
+  const sw = await pool.query(
+    `SELECT tl.wallet_id FROM transactions t
+       JOIN transaction_legs tl ON tl.transaction_id = t.id
+     WHERE t.user_id=$1 AND t.client_key=$2 LIMIT 1`,
+    [id, `payslip:${id}:${p}`]
+  );
+  let salaryWalletId: number | null = sw.rows[0]?.wallet_id ?? null;
+  if (salaryWalletId == null) {
+    const fb = await pool.query(
+      `SELECT id FROM wallets WHERE user_id=$1 AND is_active AND type='bank' ORDER BY display_order, id LIMIT 1`,
+      [id]
+    );
+    salaryWalletId = fb.rows[0]?.id ?? null;
+  }
   if (ps.rowCount === 0) {
-    return { id: null, period, total_work_hours: "", overtime_hours: "", is_confirmed: false, allowances: [], deductions: [] };
+    return { id: null, period, total_work_hours: "", overtime_hours: "", is_confirmed: false, allowances: [], deductions: [], salary_wallet_id: salaryWalletId };
   }
   const row = ps.rows[0];
   const items = await pool.query(
@@ -1201,6 +1218,7 @@ export async function getPayslipForEdit(period: string): Promise<PayslipEdit> {
     is_confirmed: row.is_confirmed,
     allowances: items.rows.filter((i) => i.item_type === "allowance").map((i) => ({ name: i.name, amount: i.amount })),
     deductions: items.rows.filter((i) => i.item_type === "deduction").map((i) => ({ name: i.name, amount: i.amount })),
+    salary_wallet_id: salaryWalletId,
   };
 }
 

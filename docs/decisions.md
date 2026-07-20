@@ -351,6 +351,11 @@
 - **影響範囲**: `app/api/payslips/ocr/route.ts`（新規）・`components/PayslipForm.tsx`・`app/payslips/[period]/edit/page.tsx`・
   `app/icon.svg`（新規）・`app/layout.tsx`。**有効化に必要なenv**: `GEMINI_API_KEY`（Vercel/App Runnerに設定）。
 - **状態**: 有効（コード完成・キー設定待ち）
+- **更新（2026-07-20）**: 本番でGeminiが404（既定モデル名がキーで利用不可）となったため、
+  ①404時に **ListModels から利用可能な flash 系モデルを自動解決して再試行**するフォールバックを追加
+  （解決結果はコールドスタートまでキャッシュ。手動指定は `GEMINI_MODEL` が最優先）
+  ② **PDF入力に対応**（ユーザー要望。inline_dataはPDFを直接受けられる。縮小不可のため上限3MB＝Vercelの4.5MB制限×base64膨張を考慮）
+  ③ env の前後空白を trim（空白入りモデル名は404の温床）④ 404/429時のエラーメッセージに対処法を明記。
 
 ## ADR-040 | 2026-07-19 | 取引の冪等キー（client_key）で二重入力を防止
 - **決定**: `transactions.client_key text` を追加し、部分ユニーク索引

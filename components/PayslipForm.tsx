@@ -61,11 +61,28 @@ export default function PayslipForm({
     return { data: dataUrl.split(",")[1], mime: "image/jpeg" };
   }
 
+  // PDF/画像 → 送信ペイロード。PDFは縮小できないためサイズ上限あり
+  // （Vercelのリクエスト上限4.5MB・base64で約1.33倍に膨らむことを考慮して3MBまで）
+  async function toPayload(file: File): Promise<{ data: string; mime: string }> {
+    if (file.type === "application/pdf") {
+      if (file.size > 3 * 1024 * 1024) {
+        throw new Error("PDFが大きすぎます（3MBまで）。該当ページだけのPDFにするか、スクショ画像でお試しください");
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      return { data: btoa(bin), mime: "application/pdf" };
+    }
+    return toResizedBase64(file);
+  }
+
   async function runOcr(file: File) {
     setMsg(null);
     setOcrBusy(true);
     try {
-      const { data, mime } = await toResizedBase64(file);
+      const { data, mime } = await toPayload(file);
       const res = await fetch("/api/payslips/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -193,10 +210,10 @@ export default function PayslipForm({
             (ocrBusy ? "opacity-60 pointer-events-none" : "")
           }
         >
-          {ocrBusy ? "🔍 読み取り中…（10秒ほど）" : "📷 給与明細の画像から自動入力"}
+          {ocrBusy ? "🔍 読み取り中…（10秒ほど）" : "📷 給与明細の画像・PDFから自動入力"}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             className="hidden"
             disabled={ocrBusy}
             onChange={(e) => {

@@ -5,9 +5,42 @@ import { requireAuthApi } from "@/lib/auth";
 // GEMINI_API_KEY（Google AI Studio の無料キー）が未設定の間、この機能は無効。
 // 画像はDBに保存しない（読み取り結果だけをフォームに流し込む使い捨て）。
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// env は貼り付け時の前後空白・改行に耐えるよう trim する（空白入りモデル名はGeminiが404を返す）
+const MODEL = (process.env.GEMINI_MODEL || "").trim() || "gemini-2.5-flash";
+// 既定モデルが404（このキー/APIバージョンで利用不可）のとき、ListModelsから自動解決した結果。
+// サーバーレスのコールドスタートまで保持され、以降のリクエストは解決済みモデルを直接使う。
+let resolvedModel: string | null = null;
 
-const PROMPT = `これは日本の給与明細の画像です。記載されている内容を読み取り、次のJSONだけを出力してください。
+// キーで利用できる Gemini の flash 系モデルを新しい順に探す（404時のフォールバック）
+async function pickAvailableModel(key: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${key}`
+    );
+    if (!res.ok) return null;
+    const d = await res.json();
+    const names: string[] = (Array.isArray(d.models) ? d.models : [])
+      .filter((m: { supportedGenerationMethods?: string[] }) =>
+        m.supportedGenerationMethods?.includes("generateContent")
+      )
+      .map((m: { name?: string }) => String(m.name ?? "").replace(/^models\//, ""))
+      .filter(
+        (n: string) =>
+          n.startsWith("gemini") &&
+          n.includes("flash") &&
+          !/live|tts|image|audio|embedding|thinking/.test(n)
+      );
+    if (names.length === 0) return null;
+    names.sort().reverse(); // 名前の降順 ≒ 新しいバージョンが先頭
+    return names.find((n) => !/preview|exp/.test(n)) ?? names[0];
+  } catch {
+    return null;
+  }
+}
+
+const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+const PROMPT = `これは日本の給与明細（画像またはPDF）です。記載されている内容を読み取り、次のJSONだけを出力してください。
 {
   "period": "YYYY-MM（支給対象の年月。読み取れなければnull）",
   "total_work_hours": 総労働時間の数値（記載が無ければnull）,
@@ -25,7 +58,7 @@ export async function POST(req: Request) {
   const denied = await requireAuthApi();
   if (denied) return denied;
 
-  const key = process.env.GEMINI_API_KEY;
+  const key = (process.env.GEMINI_API_KEY || "").trim();
   if (!key) {
     return NextResponse.json(
       { ok: false, error: "GEMINI_API_KEY が未設定です（Google AI Studio で無料発行できます）" },
@@ -42,31 +75,56 @@ export async function POST(req: Request) {
   if (!body.image || !body.mime_type) {
     return NextResponse.json({ ok: false, error: "image / mime_type は必須です" }, { status: 400 });
   }
+  if (!ALLOWED_MIME.includes(body.mime_type)) {
+    return NextResponse.json(
+      { ok: false, error: "対応形式は JPEG / PNG / WebP / PDF です" },
+      { status: 400 }
+    );
+  }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-    {
+  const payload = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          { text: PROMPT },
+          { inline_data: { mime_type: body.mime_type, data: body.image } },
+        ],
+      },
+    ],
+    generationConfig: { response_mime_type: "application/json", temperature: 0 },
+  });
+  const call = (model: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PROMPT },
-              { inline_data: { mime_type: body.mime_type, data: body.image } },
-            ],
-          },
-        ],
-        generationConfig: { response_mime_type: "application/json", temperature: 0 },
-      }),
+      body: payload,
+    });
+
+  let model = resolvedModel ?? MODEL;
+  let res = await call(model);
+
+  // 404 = このキー/APIバージョンでそのモデル名が使えない → 利用可能なモデルを自動解決して1回だけ再試行
+  if (res.status === 404 && !resolvedModel) {
+    const alt = await pickAvailableModel(key);
+    if (alt && alt !== model) {
+      console.warn(`Gemini model "${model}" not found. Falling back to "${alt}"`);
+      model = alt;
+      res = await call(model);
+      if (res.ok) resolvedModel = alt;
     }
-  );
+  }
 
   if (!res.ok) {
     const detail = await res.text();
     console.error("Gemini API error:", res.status, detail.slice(0, 500));
+    const hint =
+      res.status === 404
+        ? `モデル「${model}」がこのAPIキーで利用できません。Vercelの環境変数 GEMINI_MODEL に利用可能なモデル名を設定してください`
+        : res.status === 429
+        ? "無料枠のレート制限に達しました。1分ほど待って再試行してください"
+        : "時間をおいて再試行してください";
     return NextResponse.json(
-      { ok: false, error: `読み取りAPIがエラーを返しました（${res.status}）。時間をおいて再試行してください` },
+      { ok: false, error: `読み取りAPIがエラーを返しました（${res.status}）。${hint}` },
       { status: 502 }
     );
   }

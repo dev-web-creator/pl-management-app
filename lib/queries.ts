@@ -114,6 +114,19 @@ export async function getUserSettings(): Promise<UserSettings> {
   return rows[0] ?? { email: null, fiscal_year_start_month: 4, hidden_pages: [] };
 }
 
+// 取引がまだ1件も無いか（新規ユーザーのオンボーディング表示に使う / ADR-051）
+export async function hasNoTransactions(): Promise<boolean> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT NOT EXISTS (SELECT 1 FROM transactions WHERE user_id=$1) AS empty`,
+      [await uid()]
+    );
+    return rows[0]?.empty ?? false;
+  } catch {
+    return false;
+  }
+}
+
 // ナビ用の非表示ページ一覧（layoutから毎リクエスト呼ばれるため失敗しても落とさない）
 export async function getHiddenPages(): Promise<string[]> {
   try {

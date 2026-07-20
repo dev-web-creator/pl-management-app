@@ -71,6 +71,15 @@ export default async function SettingsPage() {
           </p>
         </section>
 
+        {/* 使い方ガイド */}
+        <Link
+          href="/guide"
+          className="block bg-white rounded-2xl shadow-sm p-5 hover:bg-slate-50"
+        >
+          <span className="text-sm font-semibold text-slate-600">📖 使い方ガイド</span>
+          <span className="block text-[11px] text-slate-400 mt-1">初期設定から毎月の運用・振り返りまでの流れ</span>
+        </Link>
+
         {/* FY開始月（ADR-017） */}
         <section className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-sm font-semibold text-slate-500 mb-3">会計年度（FY）の開始月</h2>

@@ -159,12 +159,14 @@ export default function CategoryManager({ categories }: { categories: CategoryMa
             )}
 
             <div className="space-y-0.5">
-              {ordered.length === 0 && <p className="text-xs text-slate-400">まだありません。</p>}
+              {ordered.length === 0 ? (
+                <p className="text-xs text-slate-400">まだありません。</p>
+              ) : null}
               {ordered.map(({ c, depth }) => {
                 const isGroup = c.child_count > 0;
                 return (
                   <div
-                    key={c.id}
+                    key={`cat-${c.id}`}
                     style={{ paddingLeft: depth * 20 }}
                     className={"flex items-center justify-between gap-2 text-sm py-1 " + (c.is_active ? "" : "opacity-40")}
                   >

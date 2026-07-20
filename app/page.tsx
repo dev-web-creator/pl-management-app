@@ -6,6 +6,7 @@ import {
   getInputCategories,
   getWalletOptions,
   getFixedCostPlanVsActual,
+  hasNoTransactions,
 } from "@/lib/queries";
 import AddTransactionForm from "@/components/AddTransactionForm";
 import RecordFixedCostButton from "@/components/RecordFixedCostButton";
@@ -57,7 +58,7 @@ export default async function Home({
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const formDefaultDate = period === thisMonth ? todayStr : period;
 
-  const [pl, wallets, assets, varGroups, inputCats, walletOpts, fixedItems, prevPl, prevFixedItems] =
+  const [pl, wallets, assets, varGroups, inputCats, walletOpts, fixedItems, prevPl, prevFixedItems, isNew] =
     await Promise.all([
       getPLSummary(period),
       getWalletBalances(),
@@ -68,6 +69,7 @@ export default async function Home({
       getFixedCostPlanVsActual(period),
       getPLSummary(prevMonth),
       getFixedCostPlanVsActual(prevMonth),
+      hasNoTransactions(),
     ]);
 
   // 固定費は予実突合（ADR-030）：各項目 実額があれば実額、無ければ予定額。
@@ -111,6 +113,35 @@ export default async function Home({
             </Link>
           </div>
         </header>
+
+        {/* 新規ユーザー向けオンボーディング（取引ゼロのときだけ / ADR-051） */}
+        {isNew && (
+          <section className="bg-white rounded-2xl shadow-sm p-5 border border-emerald-100">
+            <h2 className="text-base font-bold">🌱 ようこそ！まず3ステップだけ</h2>
+            <p className="text-xs text-slate-500 mt-1 mb-3">
+              あなた専用の初期データが用意されています。次の順で設定すると、毎日の入力がスムーズです。
+            </p>
+            <ol className="space-y-2 text-sm">
+              <li className="flex items-center gap-2">
+                <span className="w-5 h-5 grid place-items-center rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold shrink-0">1</span>
+                <Link href="/wallets" className="text-sky-600 hover:underline">🏦 口座・カードを登録</Link>
+                <span className="text-slate-400 text-xs">（あなたの銀行・クレカ・電子マネー）</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-5 h-5 grid place-items-center rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold shrink-0">2</span>
+                <Link href="/fixed-costs" className="text-sky-600 hover:underline">📌 固定費を登録</Link>
+                <span className="text-slate-400 text-xs">（家賃・サブスクなど毎月の固定支出）</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-5 h-5 grid place-items-center rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold shrink-0">3</span>
+                <span>下の「＋取引を入力」から支出を記録</span>
+              </li>
+            </ol>
+            <Link href="/guide" className="inline-block mt-3 text-xs font-semibold text-emerald-700 hover:underline">
+              📖 使い方ガイドを見る →
+            </Link>
+          </section>
+        )}
 
         {/* 入力フォーム */}
         <AddTransactionForm

@@ -13,10 +13,6 @@ export default function PrivacyPage() {
           <Link href="/" className="text-xs text-sky-600 hover:underline">← ホーム</Link>
         </header>
 
-        <p className="text-[11px] bg-amber-50 text-amber-700 rounded-lg p-3">
-          ⚠️ これは草案テンプレートです。家計という機微情報を扱うため、公開前に必ず専門家の確認を受けてください。
-          <b>[　]</b> は運営者情報を記入してください。
-        </p>
         <p className="text-xs text-slate-400">最終更新：2026年7月20日</p>
 
         <Section n="1. 収集する情報">
@@ -32,7 +28,7 @@ export default function PrivacyPage() {
         </Section>
         <Section n="3. 保管場所">
           データはアプリケーションのホスティング（Vercel）およびデータベース（Neon / PostgreSQL）に保管されます。
-          通信は TLS で暗号化されます。[サーバのリージョン等があれば記載]
+          通信は TLS で暗号化されます。
         </Section>
         <Section n="4. 外部サービスへの送信（重要）">
           <ul className="list-disc pl-5 space-y-1">
@@ -51,12 +47,11 @@ export default function PrivacyPage() {
         </Section>
         <Section n="5. 利用者の権利（エクスポート・削除）">
           利用者は設定画面からいつでも自身のデータをエクスポート（CSV / JSON）できます。
-          アカウントおよびデータの削除を希望する場合は、下記連絡先までご連絡ください。
-          [削除リクエストの受付・対応方針を記載]
+          アカウントおよびデータの削除を希望する場合は運営者までご連絡ください。ご連絡後、合理的な期間内に対応します。
         </Section>
         <Section n="6. 保存期間">
           データは利用者がサービスを利用する間、または削除を依頼するまで保管します。
-          退会時の取り扱いは[退会時のデータ削除ポリシーを記載]に従います。
+          退会時には、バックアップ保持期間を除き、利用者のデータを削除します。
         </Section>
         <Section n="7. Cookie">
           ログイン状態の維持のために、必要最小限の Cookie（HTTP Only の署名付きセッション）を使用します。
@@ -65,7 +60,7 @@ export default function PrivacyPage() {
         <Section n="8. 改定">
           本ポリシーは必要に応じて改定し、変更は本ページへの掲載をもって効力を生じます。
         </Section>
-        <p className="text-xs text-slate-400 pt-2">お問い合わせ／削除依頼：[連絡先メールアドレス]（運営者：[運営者名]）</p>
+        <p className="text-xs text-slate-400 pt-2">お問い合わせ・削除依頼は、My PL Ledger の運営者までご連絡ください。</p>
       </div>
     </main>
   );

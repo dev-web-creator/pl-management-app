@@ -152,9 +152,14 @@ def tx(dt, cat, amount, memo, ckey, txtype='expense'):
     add('tx:' + ('income' if txtype == 'income' else 'expense'))
 
 # ---------------- 1) 日次出費（FY-2 / FY-3） ----------------
+# 各タブはそのFYの日付範囲だけを取り込む。日次シートは1000行前後の作り置きがあり、
+# FY-2タブの末尾に翌FYの日付行（入力残骸）が存在するため、範囲外は除外して二重計上を防ぐ。
+DAILY_RANGE = {'d2': ('2025-04-01', '2026-04-01'), 'd3': ('2026-04-01', '2027-04-01')}
 daily_sum = {}  # (tag, 'YYYY-MM', appカテゴリ) → 合計（月次タブとの突合・調整用）
 for sheet, tag in [('FY-2(日次)出費', 'd2'), ('FY-3(日次)出費', 'd3')]:
     ws = wb[sheet]
+    lo, hi = DAILY_RANGE[tag]
+    skipped = {}
     header = None
     for row in ws.iter_rows(min_row=4, values_only=True):
         if header is None:
@@ -166,6 +171,11 @@ for sheet, tag in [('FY-2(日次)出費', 'd2'), ('FY-3(日次)出費', 'd3')]:
         d = row[1]
         if d is None or not isinstance(d, (int, float)): continue
         dt = serial2date(d)
+        if not (lo <= str(dt) < hi):
+            for i in cols:
+                v = num(row[i]) if i < len(row) else None
+                if v: skipped[str(dt)[:7]] = skipped.get(str(dt)[:7], 0) + v
+            continue
         for i, cat in cols.items():
             v = num(row[i]) if i < len(row) else None
             if v:
@@ -173,6 +183,8 @@ for sheet, tag in [('FY-2(日次)出費', 'd2'), ('FY-3(日次)出費', 'd3')]:
                 if str(dt) < CUTOFF:
                     k = (tag, f'{dt.year}-{dt.month:02d}', cat)
                     daily_sum[k] = daily_sum.get(k, 0) + v
+    for mo, amt in sorted(skipped.items()):
+        warn.append(f'{sheet}: FY範囲外の入力を除外: {mo} 計{amt}円（このFYタブの月次集計にも含まれない行）')
 
 # ---------------- 2) 月次支出：固定費＋支払い利息（FY-2 / FY-3） ----------------
 for sheet, tag in [('FY-2(月次)支出', 'f2'), ('FY-3(月次)支出 ', 'f3')]:

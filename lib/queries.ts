@@ -673,6 +673,73 @@ export async function getVariableGroups(period = "2026-06-01"): Promise<Category
   return rows;
 }
 
+// ---- 月次ビュー（現運用の月次タブ再現 / ADR-047） ----
+export type MonthlyIncomeRow = { id: number; name: string; pl_type: string; total: number };
+
+// 収入セクションの行：収入カテゴリ（葉）＋PL対象外のうち収入系（経費精算・借入金）。
+// シートの月次収入タブの行構成を再現する。
+export async function getMonthlyIncomeRows(period: string): Promise<MonthlyIncomeRow[]> {
+  const { rows } = await pool.query(
+    `SELECT c.id, c.name, c.pl_type,
+            COALESCE(SUM(t.amount) FILTER (WHERE t.type='income'),0)::int AS total
+     FROM categories c
+     LEFT JOIN transactions t
+       ON t.category_id = c.id AND t.user_id = $1
+      AND t.accrual_date >= $2::date AND t.accrual_date < ($2::date + interval '1 month')
+     WHERE c.user_id = $1 AND c.is_active
+       AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id)
+       AND (c.pl_type = 'income' OR (c.pl_type = 'excluded' AND c.name IN ('経費精算','借入金')))
+     GROUP BY c.id, c.name, c.pl_type
+     ORDER BY (c.pl_type = 'income') DESC, c.display_order, c.id`,
+    [await uid(), period]
+  );
+  return rows;
+}
+
+export type VariableLeafRow = { id: number; name: string; group_name: string; total: number };
+
+// 変動費の葉カテゴリ×当月合計（所属グループ名つき）。シートの月次支出タブの変動費内訳を再現。
+// 入力不可の葉（取込用など）は金額がある月だけ表示する。
+export async function getVariableLeaves(period: string): Promise<VariableLeafRow[]> {
+  const { rows } = await pool.query(
+    `WITH RECURSIVE up AS (
+       SELECT id, id AS leaf_id, parent_id
+       FROM categories
+       WHERE user_id = $1 AND pl_type = 'variable_cost'
+         AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id)
+       UNION ALL
+       SELECT c.id, up.leaf_id, c.parent_id FROM categories c JOIN up ON c.id = up.parent_id
+     ),
+     root AS (SELECT leaf_id, id AS root_id FROM up WHERE parent_id IS NULL),
+     sums AS (
+       SELECT category_id, SUM(amount)::int AS amt FROM transactions
+       WHERE user_id = $1 AND type = 'expense'
+         AND accrual_date >= $2::date AND accrual_date < ($2::date + interval '1 month')
+       GROUP BY category_id
+     )
+     SELECT l.id, l.name, rc.name AS group_name, COALESCE(s.amt,0) AS total
+     FROM categories l
+     JOIN root r ON r.leaf_id = l.id
+     JOIN categories rc ON rc.id = r.root_id
+     LEFT JOIN sums s ON s.category_id = l.id
+     WHERE l.user_id = $1 AND l.is_active
+       AND (l.is_input_allowed OR COALESCE(s.amt,0) <> 0)
+     ORDER BY rc.display_order, rc.id, l.display_order, l.id`,
+    [await uid(), period]
+  );
+  return rows;
+}
+
+// 月の確定状態（黒塗り / ADR-020）
+export async function getMonthClosed(period: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT COALESCE(bool_or(is_closed), false) AS closed
+     FROM monthly_closings WHERE user_id=$1 AND period=$2::date`,
+    [await uid(), period]
+  );
+  return rows[0]?.closed ?? false;
+}
+
 export type FixedCostItem = {
   id: number;
   name: string;
@@ -707,11 +774,15 @@ export async function getFixedCostPlanVsActual(
          AND accrual_date >= $2::date
          AND accrual_date <  ($2::date + interval '1 month')
        GROUP BY category_id
-     )
+     ),
+     -- 過去月は「実績のみ」（予定額で埋めない）。実額が無い＝その月は発生しなかった＝¥0。
+     -- 当月・未来月だけ予定額でフォールバック（現運用の"定額仮置き"を再現／ADR-030・047）。
+     is_past AS (SELECT ($2::date < date_trunc('month', CURRENT_DATE)) AS v)
      SELECT ar.id, ar.name, ar.plan, ar.wallet_name,
-            a.act                       AS actual,
-            COALESCE(a.act, ar.plan)::int AS effective,
-            (a.act IS NOT NULL)         AS is_actual
+            a.act                                                                    AS actual,
+            (CASE WHEN (SELECT v FROM is_past) THEN COALESCE(a.act, 0)
+                  ELSE COALESCE(a.act, ar.plan) END)::int                            AS effective,
+            (CASE WHEN (SELECT v FROM is_past) THEN true ELSE (a.act IS NOT NULL) END) AS is_actual
      FROM active_rules ar
      LEFT JOIN actual a ON a.category_id = ar.category_id
      ORDER BY ar.plan DESC, ar.id`,

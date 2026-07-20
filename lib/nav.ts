@@ -4,10 +4,10 @@ export type NavItem = { href: string; label: string; emoji: string; always?: boo
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "サマリ", emoji: "📊", always: true },
+  { href: "/monthly", label: "月次", emoji: "🧾" },
   { href: "/calendar", label: "カレンダー", emoji: "📅" },
   { href: "/transactions", label: "取引", emoji: "📒" },
   { href: "/transfers", label: "振替", emoji: "🔄" },
-  { href: "/fixed-costs", label: "固定費", emoji: "📌" },
   { href: "/payslips", label: "給与", emoji: "💰" },
   { href: "/cards", label: "カード", emoji: "💳" },
   { href: "/assets", label: "資産", emoji: "🐷" },

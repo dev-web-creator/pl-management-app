@@ -33,6 +33,30 @@ export default async function SettingsPage() {
           <FeatureTogglePanel hidden={settings.hidden_pages} />
         </section>
 
+        {/* マスタ管理（ADR-047：初期設定・メンテナンス系の入り口） */}
+        <section className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-slate-500 mb-3">🔧 マスタ管理</h2>
+          <div className="space-y-2">
+            <Link
+              href="/fixed-costs"
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>📌 固定費マスタ（追加・金額変更・解約）</span>
+              <span className="text-slate-400">›</span>
+            </Link>
+            <Link
+              href="/assets"
+              className="flex items-center justify-between text-sm px-3 py-2.5 rounded-xl border border-slate-100 hover:bg-slate-50"
+            >
+              <span>₿ 暗号資産の銘柄追加・評価額（資産ページ内）</span>
+              <span className="text-slate-400">›</span>
+            </Link>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            固定費マスタでONの項目は、毎月「🧾 月次」に予定額つきで自動表示されます。
+          </p>
+        </section>
+
         {/* FY開始月（ADR-017） */}
         <section className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-sm font-semibold text-slate-500 mb-3">会計年度（FY）の開始月</h2>

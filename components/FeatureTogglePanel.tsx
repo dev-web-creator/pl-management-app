@@ -39,7 +39,7 @@ export default function FeatureTogglePanel({ hidden }: { hidden: string[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9.5em, 1fr))" }}>
         {NAV_ITEMS.map((n) => {
           const off = state.has(n.href);
           const locked = !!n.always;
@@ -57,9 +57,9 @@ export default function FeatureTogglePanel({ hidden }: { hidden: string[] }) {
                   : "border-emerald-200 bg-emerald-50 text-slate-700")
               }
             >
-              <span aria-hidden="true">{n.emoji}</span>
-              <span className="flex-1">{n.label}</span>
-              <span className="text-[9px] font-semibold">
+              <span aria-hidden="true" className="shrink-0">{n.emoji}</span>
+              <span className="flex-1 min-w-0 truncate whitespace-nowrap">{n.label}</span>
+              <span className="text-[9px] font-semibold shrink-0">
                 {locked ? "固定" : off ? "OFF" : "ON"}
               </span>
             </button>

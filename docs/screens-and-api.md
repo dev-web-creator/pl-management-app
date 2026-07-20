@@ -51,6 +51,9 @@ flowchart TD
 | `/forecast` | 5か年PL（ADR-044） | 60ヶ月の実績＋見込み・FYサマリ・純資産予測ライン |
 | `/monthly` | 月次（ADR-047） | 現運用の月次タブ再現：収入行その場記録・固定費予実・変動費階層・手取り比・月確定 |
 | `/settings` | 設定（ADR-017/042/046/047） | 機能の表示ON/OFF、マスタ管理導線、FY開始月、メール通知ルール、送信履歴 |
+| `/wallets` | 口座・カード管理（ADR-048） | 銀行/カード/電子マネー/ポイント/暗号資産のCRUD・クレカ締め日/支払日/引落先 |
+| `/categories` | 費目管理（ADR-050） | PL区分ごとのツリーで費目を追加/改名/無効化/削除 |
+| `/guide` | 使い方ガイド（ADR-051） | 初期設定〜運用〜振り返りの流れ |
 | `/vision` | ビジョン/目標 | 自由記述の箱 |
 | `/inspect` | DBインスペクター | 全テーブル閲覧（本番は `INSPECT_KEY` ＋ `?key=`） |
 | `/login` | ログイン（ADR-032） | ユーザー名/パスワード入力→セッションCookie発行。認証無効時は `/` へ |
@@ -81,7 +84,12 @@ flowchart TD
 | `POST /api/notification-rules` | 通知ルール（変動費しきい値）を追加（ADR-042） |
 | `PUT /api/notification-rules/[id]` | 通知ルールの ON/OFF |
 | `DELETE /api/notification-rules/[id]` | 通知ルール削除（送信履歴もCASCADE） |
-| `POST /api/wallets` | ウォレット追加（当面 type='crypto' のみ / ADR-043） |
+| `POST /api/wallets` | ウォレット追加（全種別 / ADR-048） |
+| `PUT /api/wallets/[id]` | ウォレット更新（ADR-048） |
+| `DELETE /api/wallets/[id]` | ウォレット削除（参照ありは無効化 / ADR-048） |
+| `POST /api/categories` | 費目追加（ADR-050） |
+| `PUT /api/categories/[id]` | 費目の改名・有効/無効（ADR-050） |
+| `DELETE /api/categories/[id]` | 費目削除（使用中は不可 / ADR-050） |
 | `POST /api/auth/login` | パスワードログイン（Google未設定時のフォールバック） |
 | `GET /api/auth/google` | Google認可画面へリダイレクト（state Cookie発行 / ADR-037） |
 | `GET /api/auth/google/callback` | コード→トークン交換・入場判定・セッション発行 |

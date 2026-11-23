@@ -338,6 +338,7 @@
   2. **VPCコネクタ不使用**（Google OAuth等の外向き通信にNAT +$32/月が必要になるため）→ App Runner デフォルトegress
      ＋RDSパブリックエンドポイント（TLS・強パスワード・SG開放は通常時DB停止で緩和）。
   日常は**デフォルト停止運用**（App Runner pause＋RDS stop＝ストレージ代のみ）。詳細・ハマりどころは docs/aws-deployment.md 6.4。
+  → **2026-11-23 全撤去（ADR-056）**。
 
 ## ADR-039 | 2026-07-07 | 給与明細OCR（Gemini）＋サイトメタデータ整備
 - **決定**:
@@ -629,6 +630,27 @@
 - **未修正の既知問題**: 別途リスト化（入力値検証の甘さ、参照されているマスタの物理削除、月確定後も追記できる、
   振替に冪等キーが無い、手数料がPLに計上されない、`getCategoryMoM` が集計ノードと pl_type を見ない 等）。
   いずれもテストで現状を固定してあるため、直した瞬間にテストが落ちて気づける。
+
+## ADR-056 | 2026-11-23 | AWS検証環境を全撤去（ADR-038の環境を削除・本番は Vercel + Neon のまま）
+- **決定**: AWS検証環境（ADR-038）を全リソース削除する。AWSは Cloud Practitioner 取得などで必要になったら作り直す。
+- **理由**:
+  1. **費用**: 停止運用でも実測 **約$10/月**（2026-08〜10 の Cost Explorer：RDS 約$5〜5.1／RDSのパブリックIPv4 約$3.6〜3.7／
+     Secrets Manager $1.2／ECR $0.05）。見積もり（ストレージ代$2〜3）の3倍超。現状はクレジット消化だが、期限切れ・消化後は実費。
+     見積もりとずれた原因は、停止中でもRDSがパブリックIPv4を保持し続けること、7日ごとの自動起動で稼働時間が出ること。
+  2. **セキュリティ**: RDSに 2026-07-06 時点の実家計データのコピーがあり、パブリックエンドポイント＋SG 5432 を 0.0.0.0/0 に開放していた。
+     停止中でも7日ごとに自動起動し、夜間停止Lambdaが止めるまで最大約1日は外部から到達可能だった。本番は Neon のため保持する価値がない。
+  3. **学習目的との関係**: Cloud Practitioner は知識試験で常設環境は不要。手順書と Dockerfile が残っていれば数時間で再構築できる。
+- **削除したもの**: App Runner `pl-app`／RDS `pl-app-db`（最終スナップショットなし・自動バックアップも削除）／Secrets ×3／
+  ECR `pl-app`／CodeBuild `pl-app-build`／S3 `pl-app-build-616532575651`／Lambda `pl-app-stop-rds`／EventBridge `pl-app-nightly-stop`／
+  IAMロール ×5（apprunner-ecr・apprunner-instance・codebuild・github-actions・lambda-stop）／GitHub OIDCプロバイダ／
+  SG `pl-db-sg`・`pl-apprunner-sg`／CloudWatch Logs（apprunner・codebuild・lambda）。
+- **残したもの**: 予算アラート `pl-app-monthly`（無料の安全網）。リポジトリの `Dockerfile`・`.dockerignore`・`buildspec.yml`・
+  `infra/lambda/stop_rds.py`・`docs/aws-deployment.md`・`.github/workflows/deploy-aws.yml`（push トリガーを外し手動実行のみ＝再構築のひな形）。
+- **手作業で残る後始末**: Google Cloud Console の承認済みリダイレクトURIから
+  `https://mnuwnhxg9c.ap-northeast-1.awsapprunner.com/api/auth/google/callback` を削除する（ユーザー作業）。
+- **再構築時の注意**: パブリックIPv4課金（$0.005/時）を前提に見積もる。DBを外部公開しない構成（VPCコネクタ＋NAT、または
+  Aurora Serverless v2 等）か、学習の間だけ作って終わったら消す使い方を検討する。
+- **状態**: 実施済み（2026-11-23）。
 
 ## 要確認リスト（クローズ済み・2026-07-19棚卸し）
 - ビジョン/目標レイヤー → ✅ `/vision`（自由記述の箱・vision_notes）として実装済み。予実/資産目標との数値連動は将来検討（roadmap）。

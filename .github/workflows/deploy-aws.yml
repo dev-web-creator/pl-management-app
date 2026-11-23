@@ -4,12 +4,14 @@
 #   3. App Runner が RUNNING なら再デプロイ／停止中ならイメージ更新のみ（次回 resume 後の
 #      start-deployment で最新化。docs/aws-deployment.md 6.5 参照）
 # 認証は OIDC（AWSのキーをGitHubに保存しない）。IAMロール: pl-app-github-actions
+#
+# ⏸ 2026-11-23 AWS環境を全撤去（ADR-056）。push での自動実行は停止し、再構築時のひな形として残す。
+#    参照先（ロール・S3・CodeBuild・App Runner）は削除済みのため、このまま手動実行しても失敗する。
+#    再開時は docs/aws-deployment.md でリソースを作り直してから ARN を差し替え、push トリガーを戻す。
 name: Deploy to AWS staging
 
 on:
-  push:
-    branches: [master]
-  workflow_dispatch: # 手動実行も可
+  workflow_dispatch: # 手動実行のみ（AWS環境撤去中）
 
 permissions:
   id-token: write # OIDCトークン発行に必要

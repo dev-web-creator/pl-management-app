@@ -73,6 +73,8 @@
 - ✅ 給与明細OCR（ADR-039）：実装済み。**Vercelに `GEMINI_API_KEY`（Google AI Studio無料）を設定すると有効化**（設定までボタン非表示）。
 - ✅ Phase 3 残：画面遷移図・API一覧の文書化（`docs/screens-and-api.md`）
 - ✅ ダッシュボードにカテゴリ別比率グラフ（変動費グループの構成比バー＋%）を追加（要件のBIビュー項目）
+- 🗑️ **AWS環境は 2026-11-23 に全撤去（ADR-056）**：停止中でも約$10/月かかり、実データのコピーが外部到達可能な状態だったため。
+  下の AWS 項目（✅）は撤去前の実績として残す。再構築は `docs/aws-deployment.md` の手順で行う。
 - ✅ AWS版プロビジョニング（ADR-038）：ECR＋CodeBuild＋RDS＋Secrets＋App Runner 稼働確認済み。
   普段は**デフォルト停止運用**（起動/停止・再デプロイ手順は `docs/aws-deployment.md` 6.4〜6.6）
 - ✅ AWS: RDS自動停止（Lambda pl-app-stop-rds ＋ EventBridge 毎日05:00 JST。止め忘れ・7日自動再起動対策）

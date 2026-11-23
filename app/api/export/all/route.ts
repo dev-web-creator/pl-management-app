@@ -25,11 +25,33 @@ export async function GET() {
   if (denied) return denied;
   const USER_ID = await currentUserId();
 
+  // date列はカレンダー上の日付であってタイムスタンプではない。SELECT * で受け取ると
+  // pgライブラリが「実行環境のローカル深夜のDate」に変換し、JSON.stringify がUTCへ直すため、
+  // JSTでは 2026-06-05 が "2026-06-04T15:00:00.000Z" となり丸1日ずれる（月初は前月へ移動）。
+  // バックアップは唯一のデータ退避手段なので、date列は必ず 'YYYY-MM-DD' の文字列で出す。
+  async function selectList(table: string): Promise<string> {
+    const cols = await pool.query(
+      `SELECT column_name, data_type FROM information_schema.columns
+       WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`,
+      [table]
+    );
+    return cols.rows
+      .map((c: { column_name: string; data_type: string }) =>
+        c.data_type === "date"
+          ? `to_char("${c.column_name}",'YYYY-MM-DD') AS "${c.column_name}"`
+          : `"${c.column_name}"`
+      )
+      .join(", ");
+  }
+
   const data: Record<string, unknown[]> = {};
   for (const t of OWNED) {
     // users テーブルだけは主キーが id（user_id 列を持たない）
     const col = t === "users" ? "id" : "user_id";
-    const r = await pool.query(`SELECT * FROM ${t} WHERE ${col} = $1 ORDER BY id`, [USER_ID]);
+    const r = await pool.query(
+      `SELECT ${await selectList(t)} FROM ${t} WHERE ${col} = $1 ORDER BY id`,
+      [USER_ID]
+    );
     data[t] = r.rows;
   }
   // 子テーブル（user_idを持たない）は親の所有権で絞る

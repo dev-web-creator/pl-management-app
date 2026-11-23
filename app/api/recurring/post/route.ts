@@ -30,11 +30,18 @@ export async function POST(req: Request) {
   try {
     const r = await client.query(
       `SELECT category_id, settlement_wallet_id, amount, name
-       FROM recurring_rules WHERE id = $1 AND user_id = $2 AND is_active`,
+       FROM recurring_rules
+       WHERE id = $1 AND user_id = $2 AND is_active
+         -- 年額(yearly)は月次PLに出さない設計(ADR-035)。ここで記録できてしまうと
+         -- 予実明細には出ないのに getPLSummary の固定費だけ増え、内訳と合計が食い違う。
+         AND billing_cycle = 'monthly'`,
       [ruleId, USER_ID]
     );
     if (r.rowCount === 0) {
-      return NextResponse.json({ ok: false, error: "固定費マスタが見つかりません" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "月額の固定費マスタが見つかりません（年額ルールは月次に記録できません）" },
+        { status: 404 }
+      );
     }
     const rule = r.rows[0];
     const amount =
@@ -57,11 +64,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // 冪等キー。上の重複チェックはトランザクション外・別コネクションで走るため、
+    // 二重送信やリトライ、複数インスタンスの同時実行ではすり抜ける。
+    // ユニーク索引 uq_tx_user_client_key を最後の砦にする（取引POSTと同じ仕組み / ADR-040）。
+    const clientKey = `rule:${ruleId}:${period}`;
+
     await client.query("BEGIN");
     const tx = await client.query(
-      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo)
-       VALUES ($1, $2, 'expense', $3, $4, $5) RETURNING id`,
-      [USER_ID, rule.category_id, amount, period, `固定費(マスタから記録): ${rule.name}`]
+      `INSERT INTO transactions(user_id, category_id, type, amount, accrual_date, memo, client_key)
+       VALUES ($1, $2, 'expense', $3, $4, $5, $6) RETURNING id`,
+      [USER_ID, rule.category_id, amount, period, `固定費(マスタから記録): ${rule.name}`, clientKey]
     );
     await client.query(
       `INSERT INTO transaction_legs(transaction_id, wallet_id, amount) VALUES ($1, $2, $3)`,
@@ -69,8 +81,15 @@ export async function POST(req: Request) {
     );
     await client.query("COMMIT");
     return NextResponse.json({ ok: true, id: tx.rows[0].id });
-  } catch (e) {
+  } catch (e: unknown) {
     await client.query("ROLLBACK");
+    // 同時実行で同じ client_key が衝突した場合は「記録済み」として409を返す
+    if (typeof e === "object" && e !== null && (e as { code?: string }).code === "23505") {
+      return NextResponse.json(
+        { ok: false, error: "この月は既に実額が記録済みです" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "不明なエラー" },
       { status: 500 }

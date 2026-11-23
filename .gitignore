@@ -21,3 +21,6 @@ npm-debug.log*
 data/
 tsconfig.tsbuildinfo
 db/import/import.sql
+
+# DBバックアップ（実際の家計データを含むためコミット禁止）
+backups/

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireAuthApi, currentUserId } from "@/lib/auth";
 import { checkVariableCostThresholds } from "@/lib/notify";
+import { checkRefs } from "@/lib/ownership";
 
 
 // 取引を削除（transaction_legs は ON DELETE CASCADE で自動削除）
@@ -48,6 +49,7 @@ export async function PUT(
     accrual_date?: string;
     memo?: string;
     wallet_id?: number;
+    attach_wallet?: boolean; // 脚なし取引に決済手段を「あえて」紐付けるときだけ true
   };
   try {
     body = await req.json();
@@ -61,14 +63,20 @@ export async function PUT(
     !["expense", "income"].includes(type ?? "") ||
     !amount ||
     amount <= 0 ||
-    !accrual_date ||
-    !wallet_id
+    !accrual_date
   ) {
     return NextResponse.json(
-      { ok: false, error: "category_id / type / amount(>0) / accrual_date / wallet_id は必須です" },
+      { ok: false, error: "category_id / type / amount(>0) / accrual_date は必須です" },
       { status: 400 }
     );
   }
+
+  // 参照先(費目・決済手段)の所有者検証
+  const refErr = await checkRefs(pool, USER_ID, {
+    walletIds: wallet_id ? [wallet_id] : [],
+    categoryId: category_id,
+  });
+  if (refErr) return NextResponse.json({ ok: false, error: refErr }, { status: 400 });
 
   const client = await pool.connect();
   try {
@@ -83,12 +91,34 @@ export async function PUT(
       await client.query("ROLLBACK");
       return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
     }
-    // 脚を入れ替え（単一脚に集約）
-    await client.query(`DELETE FROM transaction_legs WHERE transaction_id=$1`, [txId]);
-    await client.query(
-      `INSERT INTO transaction_legs(transaction_id, wallet_id, amount) VALUES ($1,$2,$3)`,
-      [txId, wallet_id, amount]
+
+    // 決済手段の脚をどう扱うか。
+    // インポート由来の過去取引は脚を持たない（本番の99.3%）。そこへ編集画面の
+    // wallet_id フォールバック（先頭ウォレット）で脚を生やすと、メモを直しただけで
+    // 過去の支出が今日の残高・総資産から引かれる。既定では脚を生やさず、
+    // 利用者が明示的に紐付けを選んだとき（attach_wallet=true）だけ作成する。
+    const legRes = await client.query(
+      `SELECT count(*)::int AS n FROM transaction_legs WHERE transaction_id=$1`,
+      [txId]
     );
+    const legCount: number = legRes.rows[0].n;
+    const replaceLegs = legCount > 0 || body.attach_wallet === true;
+
+    if (replaceLegs) {
+      if (!wallet_id) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          { ok: false, error: "決済手段(wallet_id)が必要です" },
+          { status: 400 }
+        );
+      }
+      // 脚を入れ替え（単一脚に集約）
+      await client.query(`DELETE FROM transaction_legs WHERE transaction_id=$1`, [txId]);
+      await client.query(
+        `INSERT INTO transaction_legs(transaction_id, wallet_id, amount) VALUES ($1,$2,$3)`,
+        [txId, wallet_id, amount]
+      );
+    }
     await client.query("COMMIT");
     // 通知チェック（ADR-042）: 編集で当月変動費がしきい値を跨ぐこともある
     if (type === "expense") await checkVariableCostThresholds(USER_ID, accrual_date);

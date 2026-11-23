@@ -77,7 +77,17 @@ export default function ReconcileForm({ rows, today }: { rows: ReconcileRow[]; t
               <input
                 inputMode="numeric"
                 value={v ?? ""}
-                onChange={(e) => setVals({ ...vals, [r.id]: e.target.value.replace(/[^0-9]/g, "") })}
+                onChange={(e) =>
+                  // クレカは算出残高が負（未払い）なのでマイナスを入力できる必要がある。
+                  // 数字だけに絞ると符号が落ち、正の値を記録して同期すると純資産が
+                  // 未払い額の2倍ずれたまま「差分0」の検収を通過してしまう。
+                  setVals({
+                    ...vals,
+                    [r.id]: e.target.value
+                      .replace(/[^0-9-]/g, "")
+                      .replace(/(?!^)-/g, "") // マイナスは先頭の1つだけ
+                  })
+                }
                 placeholder="実残高"
                 className="w-28 border rounded-lg px-2 py-1.5 text-sm text-right tabular-nums"
               />

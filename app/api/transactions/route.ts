@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool, { ensureMigrated } from "@/lib/db";
 import { requireAuthApi, currentUserId } from "@/lib/auth";
 import { checkVariableCostThresholds } from "@/lib/notify";
+import { checkRefs } from "@/lib/ownership";
 
 
 type Leg = { wallet_id: number; amount: number };
@@ -65,6 +66,14 @@ export async function POST(req: Request) {
 
   // --- DBトランザクションで取引＋脚を原子的に挿入 ---
   await ensureMigrated();
+
+  // 参照先(費目・決済手段)が自分のものかを検証する。
+  // これが無いと他人のウォレットを自分の取引に紐付けられる（マルチユーザー分離の破れ）。
+  const refErr = await checkRefs(pool, USER_ID, {
+    walletIds: legs.map((l) => l.wallet_id),
+    categoryId: category_id,
+  });
+  if (refErr) return NextResponse.json({ ok: false, error: refErr }, { status: 400 });
 
   // 冪等性：同じ client_key の取引が既にあれば新規作成せず既存を返す（二重入力防止）
   if (clientKey) {

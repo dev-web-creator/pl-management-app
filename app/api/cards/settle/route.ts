@@ -49,10 +49,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "この締めサイクルは既に消込済みです" }, { status: 409 });
   }
 
-  const { rows } = await pool.query(
-    `INSERT INTO transfers (user_id, from_wallet_id, to_wallet_id, amount, kind, transfer_date, memo)
-     VALUES ($1,$2,$3,$4,'card_settlement',$5,$6) RETURNING id`,
-    [USER_ID, fromWallet, b.card_id, b.amount, b.pay_date, memo]
-  );
-  return NextResponse.json({ ok: true, id: rows[0].id });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO transfers (user_id, from_wallet_id, to_wallet_id, amount, kind, transfer_date, memo)
+       VALUES ($1,$2,$3,$4,'card_settlement',$5,$6) RETURNING id`,
+      [USER_ID, fromWallet, b.card_id, b.amount, b.pay_date, memo]
+    );
+    return NextResponse.json({ ok: true, id: rows[0].id });
+  } catch (e: unknown) {
+    // 上の重複チェックは別コネクションで走るため、複数インスタンスの同時実行では
+    // すり抜ける。最後の砦は部分ユニーク索引 uq_card_settlement（migrations/007）。
+    // 銀行から請求額が二重に引かれるのを、ここで確実に止める。
+    if (typeof e === "object" && e !== null && (e as { code?: string }).code === "23505") {
+      return NextResponse.json(
+        { ok: false, error: "この締めサイクルは既に消込済みです" },
+        { status: 409 }
+      );
+    }
+    throw e;
+  }
 }

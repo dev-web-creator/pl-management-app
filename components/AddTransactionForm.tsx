@@ -53,6 +53,10 @@ export default function AddTransactionForm({
     { walletId: wallets[0]?.id ?? 0, amount: 0 },
     { walletId: wallets[1]?.id ?? wallets[0]?.id ?? 0, amount: 0 },
   ]);
+  // 脚（決済手段の紐付け）を持たない取引の編集（インポート由来の過去取引 = 本番の99.3%）。
+  // 既定では紐付けない。チェックしたときだけ残高に反映する。
+  const isLegless = isEdit && edit!.legCount === 0;
+  const [attachWallet, setAttachWallet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   // カテゴリの絞り込み（③）：部分一致でプルダウンの選択肢を絞る
@@ -99,6 +103,10 @@ export default function AddTransactionForm({
       body = { ...body, legs: valid.map((l) => ({ wallet_id: l.walletId, amount: l.amount })) };
     } else {
       body = { ...body, wallet_id: walletId };
+    }
+    // 脚なし取引の編集では、明示的に選んだときだけ決済手段を紐付ける（残高への影響を防ぐ）
+    if (isLegless) {
+      body.attach_wallet = attachWallet;
     }
     // 冪等キー：作成時のみ。同じ入力の再送信（連打・リトライ）は二重作成されない
     if (!isEdit) {
@@ -160,6 +168,27 @@ export default function AddTransactionForm({
         <p className="text-[11px] text-amber-600 bg-amber-50 rounded p-2">
           ⚠️ この取引は分割払い（{edit!.legCount}脚）です。保存すると単一の決済手段に集約されます。
         </p>
+      )}
+
+      {isLegless && (
+        <div className="text-[11px] text-slate-600 bg-slate-50 rounded p-2 space-y-1.5">
+          <p>
+            この取引には決済手段が紐付いていません（過去データの取り込み分）。
+            このまま保存すれば<strong>残高・総資産は変わりません</strong>。
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={attachWallet}
+              onChange={(e) => setAttachWallet(e.target.checked)}
+            />
+            <span>
+              決済手段を紐付ける（
+              <strong className="text-amber-600">残高から {yen(parseInt(amount, 10) || 0)} 引かれます</strong>
+              ）
+            </span>
+          </label>
+        </div>
       )}
 
       <div className="flex gap-2 text-sm">
@@ -230,7 +259,7 @@ export default function AddTransactionForm({
             ))}
           </select>
         </div>
-        {!useSplit && (
+        {!useSplit && !(isLegless && !attachWallet) && (
           <div>
             <label className="text-xs text-slate-500">決済手段</label>
             <select

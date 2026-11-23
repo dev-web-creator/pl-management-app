@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireAuthApi, currentUserId } from "@/lib/auth";
+import { checkRefs } from "@/lib/ownership";
 
 const KINDS = ["transfer", "charge", "cash_withdrawal", "card_settlement"];
 
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
     kind?: string;
     transfer_date?: string;
     memo?: string;
+    fee_category_id?: number; // 手数料の費目（列は存在するが、現状PL集計は参照していない）
   };
   try {
     b = await req.json();
@@ -43,11 +45,21 @@ export async function POST(req: Request) {
   }
   const fee = Number.isInteger(b.fee) && (b.fee as number) >= 0 ? (b.fee as number) : 0;
 
+  // 出金元・入金先が自分のウォレットかを検証する。
+  // これが無いと他人の口座を出金元に指定して自分の総資産を増やせる。
+  const refErr = await checkRefs(pool, USER_ID, {
+    walletIds: [b.from_wallet_id, b.to_wallet_id],
+    categoryId: b.fee_category_id,
+  });
+  if (refErr) return NextResponse.json({ ok: false, error: refErr }, { status: 400 });
+
   const { rows } = await pool.query(
     `INSERT INTO transfers
-       (user_id, from_wallet_id, to_wallet_id, amount, fee, kind, transfer_date, memo)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-    [USER_ID, b.from_wallet_id, b.to_wallet_id, b.amount, fee, kind, b.transfer_date, b.memo ?? null]
+       (user_id, from_wallet_id, to_wallet_id, amount, fee, fee_category_id, kind, transfer_date, memo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+    [USER_ID, b.from_wallet_id, b.to_wallet_id, b.amount, fee,
+     fee > 0 ? (b.fee_category_id ?? null) : null,
+     kind, b.transfer_date, b.memo ?? null]
   );
   return NextResponse.json({ ok: true, id: rows[0].id });
 }

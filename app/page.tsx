@@ -262,7 +262,7 @@ export default async function Home({
                   </span>
                   <span className="flex items-center gap-2 tabular-nums">
                     <span className={f.is_actual ? "text-emerald-600 font-semibold" : "text-slate-400"}>
-                      {yen(f.is_actual ? (f.actual as number) : f.plan)}
+                      {yen(f.effective)}
                     </span>
                     <span
                       className={

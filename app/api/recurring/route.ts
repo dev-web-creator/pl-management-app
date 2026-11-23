@@ -58,6 +58,27 @@ export async function POST(req: Request) {
     (b.payment_month as number) <= 12
       ? b.payment_month
       : null;
+  // 予実の突合は category_id をキーに行うため（lib/queries.ts の getFixedCostPlanVsActual）、
+  // 同一カテゴリに月額ルールが2本あると、1件の実額が両方の行に貼られて固定費が二重計上になる。
+  // 「1カテゴリ1ルール」を入口で強制して、この罠を塞ぐ。
+  if (cycle === "monthly") {
+    const dup = await pool.query(
+      `SELECT r.name FROM recurring_rules r
+       WHERE r.user_id=$1 AND r.category_id=$2 AND r.is_active AND r.billing_cycle='monthly'
+       LIMIT 1`,
+      [USER_ID, b.category_id]
+    );
+    if ((dup.rowCount ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `この費目には既に月額の固定費「${dup.rows[0].name}」が登録されています。実額の突合が費目単位のため、1つの費目に月額ルールは1つまでです。費目を分けるか、既存のルールの金額を変更してください。`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const { rows } = await pool.query(
     `INSERT INTO recurring_rules
        (user_id, name, category_id, amount, settlement_wallet_id, start_month, end_month, billing_day, billing_cycle, payment_month)

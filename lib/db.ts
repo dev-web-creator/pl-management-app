@@ -60,6 +60,11 @@ ALTER TABLE wallets ADD CONSTRAINT wallets_type_check
 -- 機能の表示ON/OFF（ADR-046）: 非表示にしたページのhref配列
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS hidden_pages jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- カード消込の二重登録防止（007）: アプリ側のSELECT→INSERTは同時実行ですり抜けるため、
+-- DBで一意性を強制する。論理キー = ユーザー × カード × 締めサイクル(memo)。
+CREATE UNIQUE INDEX IF NOT EXISTS uq_card_settlement
+  ON transfers (user_id, to_wallet_id, memo)
+  WHERE kind = 'card_settlement';
 `;
 
 let migrated: Promise<void> | null = null;

@@ -225,7 +225,7 @@ export async function getWalletBalances(): Promise<WalletBalance[]> {
      bal AS (
        SELECT w.name, w.type,
          -- crypto は最新スナップショット（評価額の手入力）を「正」とする（ADR-043）
-         (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+         (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance + COALESCE(csa.d,0)
                ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END)::int AS balance,
          w.id
        FROM wallets w
@@ -233,9 +233,19 @@ export async function getWalletBalances(): Promise<WalletBalance[]> {
        LEFT JOIN tr_in  ON tr_in.wid  = w.id
        LEFT JOIN tr_out ON tr_out.wid = w.id
        LEFT JOIN LATERAL (
-         SELECT actual_balance FROM balance_snapshots s
-         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+         SELECT s.actual_balance, s.as_of_date FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY s.as_of_date DESC LIMIT 1
        ) cs ON w.type='crypto'
+       -- 評価額スナップショットより後の振替は、スナップショットに反映されていないので加算する。
+       -- これが無いと crypto への入金が総資産から消える（出金元からは引かれるため）。
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(CASE WHEN tf.to_wallet_id = w.id THEN tf.amount
+                                  ELSE -(tf.amount + tf.fee) END), 0) AS d
+         FROM transfers tf
+         WHERE tf.user_id = $1
+           AND tf.transfer_date > cs.as_of_date
+           AND (tf.to_wallet_id = w.id OR tf.from_wallet_id = w.id)
+       ) csa ON w.type='crypto' AND cs.as_of_date IS NOT NULL
        WHERE w.user_id = $1
      )
      SELECT name, type, balance FROM bal
@@ -261,16 +271,26 @@ export async function getAssets(): Promise<Assets> {
      bal AS (
        SELECT w.type, w.include_in_assets,
          -- crypto は最新スナップショット（評価額）を「正」とする（ADR-043）
-         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance + COALESCE(csa.d,0)
               ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END AS balance
        FROM wallets w
        LEFT JOIN legs ON legs.wallet_id=w.id
        LEFT JOIN tr_in ON tr_in.wid=w.id
        LEFT JOIN tr_out ON tr_out.wid=w.id
        LEFT JOIN LATERAL (
-         SELECT actual_balance FROM balance_snapshots s
-         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+         SELECT s.actual_balance, s.as_of_date FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY s.as_of_date DESC LIMIT 1
        ) cs ON w.type='crypto'
+       -- 評価額スナップショットより後の振替は、スナップショットに反映されていないので加算する。
+       -- これが無いと crypto への入金が総資産から消える（出金元からは引かれるため）。
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(CASE WHEN tf.to_wallet_id = w.id THEN tf.amount
+                                  ELSE -(tf.amount + tf.fee) END), 0) AS d
+         FROM transfers tf
+         WHERE tf.user_id = $1
+           AND tf.transfer_date > cs.as_of_date
+           AND (tf.to_wallet_id = w.id OR tf.from_wallet_id = w.id)
+       ) csa ON w.type='crypto' AND cs.as_of_date IS NOT NULL
        WHERE w.user_id=$1
      )
      SELECT
@@ -372,7 +392,7 @@ export async function getWalletsForManagement(): Promise<WalletManageRow[]> {
      SELECT w.id, w.name, w.type, w.initial_balance, w.include_in_assets, w.is_balance_tracked, w.is_active,
             w.closing_day, w.closing_eom, w.payment_day, w.payment_eom, w.payment_month_offset,
             w.settlement_wallet_id, sw.name AS settlement_name,
-            (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+            (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance + COALESCE(csa.d,0)
                   ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END)::int AS balance,
             (COALESCE(legs.n,0) + COALESCE(tr_in.n,0) + COALESCE(tr_out.n,0)
              + (SELECT COUNT(*) FROM recurring_rules r WHERE r.settlement_wallet_id=w.id)
@@ -384,8 +404,15 @@ export async function getWalletsForManagement(): Promise<WalletManageRow[]> {
      LEFT JOIN tr_in  ON tr_in.wid  = w.id
      LEFT JOIN tr_out ON tr_out.wid = w.id
      LEFT JOIN LATERAL (
-       SELECT actual_balance FROM balance_snapshots s WHERE s.wallet_id=w.id ORDER BY as_of_date DESC LIMIT 1
+       SELECT s.actual_balance, s.as_of_date FROM balance_snapshots s WHERE s.wallet_id=w.id ORDER BY s.as_of_date DESC LIMIT 1
      ) cs ON w.type='crypto'
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(SUM(CASE WHEN tf.to_wallet_id = w.id THEN tf.amount
+                                ELSE -(tf.amount + tf.fee) END), 0) AS d
+       FROM transfers tf
+       WHERE tf.user_id = $1 AND tf.transfer_date > cs.as_of_date
+         AND (tf.to_wallet_id = w.id OR tf.from_wallet_id = w.id)
+     ) csa ON w.type='crypto' AND cs.as_of_date IS NOT NULL
      WHERE w.user_id=$1
      ORDER BY w.is_active DESC, w.display_order, w.id`,
     [await uid()]
@@ -449,10 +476,27 @@ export async function getReconcileData(): Promise<ReconcileRow[]> {
      tr_in  AS (SELECT to_wallet_id   AS wid, SUM(amount)     AS a FROM transfers WHERE user_id=$1 GROUP BY to_wallet_id),
      tr_out AS (SELECT from_wallet_id AS wid, SUM(amount+fee) AS a FROM transfers WHERE user_id=$1 GROUP BY from_wallet_id),
      bal AS (
-       SELECT w.id, w.name, w.type, w.is_balance_tracked,
-         (w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0))::int AS balance
+       SELECT w.id, w.name, w.type, w.is_balance_tracked, w.is_active,
+         -- crypto は最新スナップショット（評価額）を「正」とする（ADR-043）。
+         -- getWalletBalances / getAssets と同じ計算にしないと、この画面だけが
+         -- 評価額の全額を「記入漏れ」として出し続け、差分を0にできなくなる。
+         (CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL
+               THEN cs.actual_balance + COALESCE(csa.d,0)
+               ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0)
+          END)::int AS balance
        FROM wallets w
        LEFT JOIN legs ON legs.wallet_id=w.id LEFT JOIN tr_in ON tr_in.wid=w.id LEFT JOIN tr_out ON tr_out.wid=w.id
+       LEFT JOIN LATERAL (
+         SELECT s.actual_balance, s.as_of_date FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY s.as_of_date DESC LIMIT 1
+       ) cs ON w.type='crypto'
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(CASE WHEN tf.to_wallet_id = w.id THEN tf.amount
+                                  ELSE -(tf.amount + tf.fee) END), 0) AS d
+         FROM transfers tf
+         WHERE tf.user_id = $1 AND tf.transfer_date > cs.as_of_date
+           AND (tf.to_wallet_id = w.id OR tf.from_wallet_id = w.id)
+       ) csa ON w.type='crypto' AND cs.as_of_date IS NOT NULL
        WHERE w.user_id=$1
      )
      SELECT b.id, b.name, b.type, b.balance AS computed,
@@ -462,7 +506,8 @@ export async function getReconcileData(): Promise<ReconcileRow[]> {
        SELECT actual_balance, as_of_date FROM balance_snapshots s
        WHERE s.wallet_id=b.id ORDER BY as_of_date DESC LIMIT 1
      ) s ON true
-     WHERE b.is_balance_tracked
+     -- 停止した口座は照合対象から外す（002の確認クエリと一覧を一致させる）
+     WHERE b.is_balance_tracked AND b.is_active
      ORDER BY b.type, b.id`,
     [await uid()]
   );
@@ -641,7 +686,7 @@ export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
      aw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type NOT IN ('credit_card','crypto')),
      cw AS (SELECT id FROM wallets WHERE user_id=$1 AND type='credit_card'),
      -- crypto は各月末時点の最新スナップショット（評価額）で評価（ADR-043）
-     crw AS (SELECT id FROM wallets WHERE user_id=$1 AND include_in_assets AND type='crypto'),
+     crw AS (SELECT id, initial_balance FROM wallets WHERE user_id=$1 AND include_in_assets AND type='crypto'),
      init AS (SELECT COALESCE(SUM(initial_balance),0) AS v FROM wallets WHERE user_id=$1 AND include_in_assets AND type NOT IN ('credit_card','crypto'))
      SELECT to_char(mo.m,'YYYY-MM') AS month,
        ((SELECT v FROM init)
@@ -650,12 +695,25 @@ export async function getAssetTrend(): Promise<AssetTrendPoint[]> {
                     WHERE t.user_id=$1 AND tl.wallet_id IN (SELECT id FROM aw) AND t.accrual_date < (mo.m + interval '1 month')),0)
         + COALESCE((SELECT SUM(amount)     FROM transfers WHERE user_id=$1 AND to_wallet_id   IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
         - COALESCE((SELECT SUM(amount+fee) FROM transfers WHERE user_id=$1 AND from_wallet_id IN (SELECT id FROM aw) AND transfer_date < (mo.m + interval '1 month')),0)
-        + COALESCE((SELECT SUM(cv.v) FROM crw c
-                    CROSS JOIN LATERAL (
-                      SELECT s.actual_balance AS v FROM balance_snapshots s
+        -- crypto: 各月末時点の最新スナップショット（評価額）を基準にしつつ、
+        -- その後の振替を加算する。CROSS JOIN だと評価額未入力のウォレットが行ごと落ち、
+        -- 銀行から出た振替額だけが総資産から消えていた（getAssets 側は対処済み / ADR-043）。
+        + COALESCE((SELECT SUM(
+                      COALESCE(cv.v, c.initial_balance)
+                      + COALESCE((SELECT SUM(CASE WHEN tf.to_wallet_id = c.id
+                                                  THEN tf.amount ELSE -(tf.amount + tf.fee) END)
+                                  FROM transfers tf
+                                  WHERE tf.user_id = $1
+                                    AND (tf.to_wallet_id = c.id OR tf.from_wallet_id = c.id)
+                                    AND tf.transfer_date < (mo.m + interval '1 month')
+                                    AND (cv.d IS NULL OR tf.transfer_date > cv.d)), 0)
+                    )
+                    FROM crw c
+                    LEFT JOIN LATERAL (
+                      SELECT s.actual_balance AS v, s.as_of_date AS d FROM balance_snapshots s
                       WHERE s.wallet_id = c.id AND s.as_of_date < (mo.m + interval '1 month')
                       ORDER BY s.as_of_date DESC LIMIT 1
-                    ) cv),0)
+                    ) cv ON true),0)
        )::int AS total_assets,
        ( COALESCE((SELECT SUM(CASE WHEN t.type='income' THEN tl.amount ELSE -tl.amount END)
                     FROM transaction_legs tl JOIN transactions t ON t.id=tl.transaction_id
@@ -688,14 +746,24 @@ export async function getAssetBreakdown(): Promise<AssetTypeTotal[]> {
      bal AS (
        SELECT w.type, w.include_in_assets,
          -- crypto は最新スナップショット（評価額）を「正」とする（ADR-043）
-         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance
+         CASE WHEN w.type='crypto' AND cs.actual_balance IS NOT NULL THEN cs.actual_balance + COALESCE(csa.d,0)
               ELSE w.initial_balance + COALESCE(legs.d,0) + COALESCE(tr_in.a,0) - COALESCE(tr_out.a,0) END AS balance
        FROM wallets w
        LEFT JOIN legs ON legs.wallet_id=w.id LEFT JOIN tr_in ON tr_in.wid=w.id LEFT JOIN tr_out ON tr_out.wid=w.id
        LEFT JOIN LATERAL (
-         SELECT actual_balance FROM balance_snapshots s
-         WHERE s.wallet_id = w.id ORDER BY as_of_date DESC LIMIT 1
+         SELECT s.actual_balance, s.as_of_date FROM balance_snapshots s
+         WHERE s.wallet_id = w.id ORDER BY s.as_of_date DESC LIMIT 1
        ) cs ON w.type='crypto'
+       -- 評価額スナップショットより後の振替は、スナップショットに反映されていないので加算する。
+       -- これが無いと crypto への入金が総資産から消える（出金元からは引かれるため）。
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(CASE WHEN tf.to_wallet_id = w.id THEN tf.amount
+                                  ELSE -(tf.amount + tf.fee) END), 0) AS d
+         FROM transfers tf
+         WHERE tf.user_id = $1
+           AND tf.transfer_date > cs.as_of_date
+           AND (tf.to_wallet_id = w.id OR tf.from_wallet_id = w.id)
+       ) csa ON w.type='crypto' AND cs.as_of_date IS NOT NULL
        WHERE w.user_id=$1
      )
      SELECT type, SUM(balance)::int AS total FROM bal
@@ -783,9 +851,21 @@ export async function getMonthlyIncomeRows(period: string): Promise<MonthlyIncom
      LEFT JOIN transactions t
        ON t.category_id = c.id AND t.user_id = $1
       AND t.accrual_date >= $2::date AND t.accrual_date < ($2::date + interval '1 month')
-     WHERE c.user_id = $1 AND c.is_active
-       AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id)
+     WHERE c.user_id = $1
        AND (c.pl_type = 'income' OR (c.pl_type = 'excluded' AND c.name IN ('経費精算','借入金')))
+       -- 変動費側(getVariableLeaves)と同じ理由: 「葉」かつ「有効」だけに絞ると、
+       -- 子を後から追加した費目や無効化した費目に乗っている実績が明細から消え、
+       -- getPLSummary の可処分所得と食い違う。実績がある費目は必ず残す。
+       AND (
+         (c.is_active
+          AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id))
+         OR EXISTS (
+           SELECT 1 FROM transactions t2
+           WHERE t2.category_id = c.id AND t2.user_id = $1 AND t2.type = 'income'
+             AND t2.accrual_date >= $2::date
+             AND t2.accrual_date < ($2::date + interval '1 month')
+         )
+       )
      GROUP BY c.id, c.name, c.pl_type
      ORDER BY (c.pl_type = 'income') DESC, c.display_order, c.id`,
     [await uid(), period]
@@ -799,27 +879,38 @@ export type VariableLeafRow = { id: number; name: string; group_name: string; to
 // 入力不可の葉（取込用など）は金額がある月だけ表示する。
 export async function getVariableLeaves(period: string): Promise<VariableLeafRow[]> {
   const { rows } = await pool.query(
-    `WITH RECURSIVE up AS (
-       SELECT id, id AS leaf_id, parent_id
-       FROM categories
-       WHERE user_id = $1 AND pl_type = 'variable_cost'
-         AND NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id)
-       UNION ALL
-       SELECT c.id, up.leaf_id, c.parent_id FROM categories c JOIN up ON c.id = up.parent_id
-     ),
-     root AS (SELECT leaf_id, id AS root_id FROM up WHERE parent_id IS NULL),
-     sums AS (
+    `WITH RECURSIVE sums AS (
        SELECT category_id, SUM(amount)::int AS amt FROM transactions
        WHERE user_id = $1 AND type = 'expense'
          AND accrual_date >= $2::date AND accrual_date < ($2::date + interval '1 month')
        GROUP BY category_id
-     )
+     ),
+     -- 明細に出す費目＝「葉」だけにすると、取引が乗ったままの親（子を後から追加した費目）や
+     -- 無効化した費目の金額が明細から消え、getVariableGroups / getPLSummary の合計と食い違う。
+     -- その月に取引がある費目は、葉でなくても必ず明細に出す。
+     target AS (
+       SELECT c.id, c.parent_id
+       FROM categories c
+       WHERE c.user_id = $1 AND c.pl_type = 'variable_cost'
+         AND (
+           NOT EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id)
+           OR EXISTS (SELECT 1 FROM sums s WHERE s.category_id = c.id)
+         )
+     ),
+     up AS (
+       SELECT t.id, t.id AS leaf_id, t.parent_id FROM target t
+       UNION ALL
+       SELECT c.id, up.leaf_id, c.parent_id FROM categories c JOIN up ON c.id = up.parent_id
+     ),
+     root AS (SELECT leaf_id, id AS root_id FROM up WHERE parent_id IS NULL)
      SELECT l.id, l.name, rc.name AS group_name, COALESCE(s.amt,0) AS total
      FROM categories l
      JOIN root r ON r.leaf_id = l.id
      JOIN categories rc ON rc.id = r.root_id
      LEFT JOIN sums s ON s.category_id = l.id
-     WHERE l.user_id = $1 AND l.is_active
+     WHERE l.user_id = $1
+       -- 無効化した費目でも、その月に実績があれば明細に残す（過去月の数字を変えない）
+       AND (l.is_active OR COALESCE(s.amt,0) <> 0)
        AND (l.is_input_allowed OR COALESCE(s.amt,0) <> 0)
      ORDER BY rc.display_order, rc.id, l.display_order, l.id`,
     [await uid(), period]

@@ -28,14 +28,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if ("error" in norm) return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
   const f = norm.fields;
 
+  // initial_balance（期首残高）は、カットオーバー時に実残高を入れる重要な値。
+  // normalizeWallet は未指定を 0 に丸めるため、そのまま全項目置換すると
+  // 「名前だけ直したら残高が0に戻る」事故が起きる。キーが無いときは現在値を保つ。
+  const initialBalance = b.initial_balance === undefined ? null : f.initial_balance;
+
   const r = await pool.query(
     `UPDATE wallets SET
-       name=$1, type=$2, initial_balance=$3, include_in_assets=$4, is_balance_tracked=$5,
+       name=$1, type=$2, initial_balance=COALESCE($3, initial_balance),
+       include_in_assets=$4, is_balance_tracked=$5,
        closing_day=$6, closing_eom=$7, payment_day=$8, payment_eom=$9,
        payment_month_offset=$10, settlement_wallet_id=$11,
        is_active=COALESCE($12, is_active)
      WHERE id=$13 AND user_id=$14`,
-    [f.name, f.type, f.initial_balance, f.include_in_assets, f.is_balance_tracked,
+    [f.name, f.type, initialBalance, f.include_in_assets, f.is_balance_tracked,
      f.closing_day, f.closing_eom, f.payment_day, f.payment_eom, f.payment_month_offset,
      f.settlement_wallet_id, typeof b.is_active === "boolean" ? b.is_active : null, wid, USER_ID]
   );

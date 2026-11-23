@@ -5,19 +5,34 @@
 #  - 取引は支払い脚なし（現在の残高計算に影響させない）
 #  - カットオフ: 2026-07-01（以降はアプリが正。targets のみ未来月を投入）
 import openpyxl, os, sys, io
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-XLSX = os.path.expandvars(r'%TEMP%\claude\sheet.xlsx')
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'import.sql')
+# 入力・出力・カットオフは環境変数で上書きできる（未指定なら従来どおり）
+#   PL_SHEET  : 読み込む xlsx のパス
+#   PL_OUT    : 生成する SQL のパス
+#   PL_CUTOFF : この日付「以降」の取引・残高は取り込まない（'YYYY-MM-DD'）
+XLSX = os.environ.get('PL_SHEET') or os.path.expandvars(r'%TEMP%\claude\sheet.xlsx')
+OUT = os.environ.get('PL_OUT') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'import.sql')
 # 本番アプリに実データ未投入のため全期間取込（2026-07-20確定）。並走運用中はシートが正＝
 # シート更新後に再生成→再実行すれば冪等キーで差分だけ追加される
-CUTOFF = '2027-04-01'
+# 2026-12-01 から本格運用（ADR-057）。以降の再取込は PL_CUTOFF=2026-12-01 で行い、
+# シートに作り置きされた12月以降の予定行をアプリに入れない。
+CUTOFF = os.environ.get('PL_CUTOFF') or '2027-04-01'
 
 wb = openpyxl.load_workbook(XLSX, read_only=True, data_only=True)
 
 def serial2date(n):
     return date(1899, 12, 30) + timedelta(days=int(n))
+
+def to_date(v):
+    """セルの日付を date にする。xlsx の書き出し方によって、同じ日付列が
+    Excelシリアル値（数値）で来る場合と datetime で来る場合がある（2026-11 の書き出しは datetime）。
+    数値はシリアル値とみなせる範囲（> 40000 ≒ 2009年以降）だけ受け付ける。"""
+    if isinstance(v, datetime): return v.date()
+    if isinstance(v, date): return v
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 40000: return serial2date(v)
+    return None
 
 def month_end(y, m):
     nm = date(y + (m == 12), (m % 12) + 1, 1)
@@ -168,9 +183,8 @@ for sheet, tag in [('FY-2(日次)出費', 'd2'), ('FY-3(日次)出費', 'd3')]:
             for i, h in enumerate(header):
                 if h in DAILY_MAP: cols[i] = DAILY_MAP[h]
             continue
-        d = row[1]
-        if d is None or not isinstance(d, (int, float)): continue
-        dt = serial2date(d)
+        dt = to_date(row[1])
+        if dt is None: continue
         if not (lo <= str(dt) < hi):
             for i in cols:
                 v = num(row[i]) if i < len(row) else None
@@ -320,8 +334,8 @@ ws = wb['FY-1(月次)支出予実']
 rows = list(ws.iter_rows(values_only=True))
 months1 = {}
 for i, h in enumerate(rows[1]):
-    if isinstance(h, (int, float)) and h > 40000 and str(rows[0][i]).startswith('※確定'):
-        d = serial2date(h)
+    d = to_date(h)
+    if d and str(rows[0][i]).startswith('※確定'):
         if (d.year, d.month) == (2025, 4): continue  # FY-2タブと重複する境界月はFY-2を正とする
         months1[i] = (d.year, d.month)
 section = 'fixed'
@@ -365,8 +379,8 @@ ws = wb['FY-1(月次)収入予実']
 rows = list(ws.iter_rows(values_only=True))
 months1i = {}
 for i, h in enumerate(rows[1]):
-    if isinstance(h, (int, float)) and h > 40000 and str(rows[0][i]).startswith('※確定'):
-        d = serial2date(h)
+    d = to_date(h)
+    if d and str(rows[0][i]).startswith('※確定'):
         if (d.year, d.month) == (2025, 4): continue  # FY-2タブと重複する境界月はFY-2を正とする
         months1i[i] = (d.year, d.month)
 section = 'income'
@@ -437,6 +451,9 @@ for sheet in ['(FY-2)資産管理', '(FY-3)資産管理']:
             if wname.startswith('bitFlyer') and v == 0: continue
             d = month_end(y, m)
             if str(d) >= CUTOFF: continue
+            # 月末がまだ来ていない月の残高は確定値ではないので入れない（月途中に書き出したシート対策）。
+            # 実残高は /reconcile で記録したものを正とする（ADR-057）。
+            if d >= date.today(): continue
             sql.append(
                 f"INSERT INTO balance_snapshots (user_id, wallet_id, as_of_date, actual_balance)\n"
                 f"SELECT 1, w.id, '{d}', {v} FROM wallets w WHERE w.user_id=1 AND w.name='{esc(wname)}'\n"

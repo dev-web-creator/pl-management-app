@@ -4,12 +4,14 @@ import openpyxl, os, subprocess, sys, io, re
 from collections import Counter
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-XLSX = os.path.expandvars(r'%TEMP%\claude\sheet.xlsx')
+# PL_SHEET: 読み込む xlsx / PL_DB_URL: 突合先DBの接続文字列（未指定ならローカル pl_app）
+XLSX = os.environ.get('PL_SHEET') or os.path.expandvars(r'%TEMP%\claude\sheet.xlsx')
 PSQL = r'C:\pgsql\bin\psql.exe'
+DB_ARGS = [os.environ['PL_DB_URL']] if os.environ.get('PL_DB_URL') else ['-U', 'postgres', '-d', 'pl_app']
 wb = openpyxl.load_workbook(XLSX, read_only=True, data_only=True)
 
 def q(sql):
-    r = subprocess.run([PSQL, '-U', 'postgres', '-d', 'pl_app', '-t', '-A', '-F', '|', '-c', sql],
+    r = subprocess.run([PSQL, *DB_ARGS, '-X', '-t', '-A', '-F', '|', '-c', sql],
                        capture_output=True, text=True, encoding='utf-8')
     return [l.split('|') for l in r.stdout.strip().splitlines() if l]
 
@@ -77,11 +79,17 @@ for sheet, itag in [('FY-2(月次)収入', 'i2'), ('FY-3(月次)収入', 'i3')]:
 # FY-1
 ws = wb['FY-1(月次)支出予実']
 rows = list(ws.iter_rows(values_only=True))
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+def to_date(v):  # gen_import.py と同じ判定（シリアル値 / datetime の両方を受け付ける）
+    if isinstance(v, datetime): return v.date()
+    if isinstance(v, date): return v
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 40000:
+        return date(1899, 12, 30) + timedelta(days=int(v))
+    return None
 months1 = {}
 for i, h in enumerate(rows[1]):
-    if isinstance(h, (int, float)) and h > 40000 and str(rows[0][i]).startswith('※確定'):
-        d = date(1899, 12, 30) + timedelta(days=int(h))
+    d = to_date(h)
+    if d and str(rows[0][i]).startswith('※確定'):
         if (d.year, d.month) != (2025, 4): months1[i] = f'{d.year}-{d.month:02d}'
 all_row = rows[2]   # 合算費用（支払い利息セクションを含まない）
 for i, mo in months1.items():

@@ -4,6 +4,8 @@
 > Secrets / Lambda / EventBridge / IAMロール / GitHub OIDC）はすべて削除し、AWS側の月額は$0。
 > 予算アラート `pl-app-monthly` のみ安全網として残している。
 > 再構築するときは本書の手順で作り直す（ARN・URL・RDSエンドポイントは新しい値になる）。
+> 本書が参照する `Dockerfile`・`buildspec.yml`・`infra/lambda/`・`.github/workflows/deploy-aws.yml` はリポジトリから削除済み。
+> `git checkout e657c89 -- Dockerfile .dockerignore buildspec.yml infra .github` で復元してから使う。
 > 前回の実績では停止中でも **約$10/月**（RDS約$5・RDSのパブリックIPv4 約$3.7・Secrets $1.2）かかったため、
 > 「停止すればストレージ代$2〜3だけ」という見積もり（6.5節）は過小だった点に注意。
 

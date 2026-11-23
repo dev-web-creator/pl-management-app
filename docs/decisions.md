@@ -482,7 +482,9 @@
 - **問題**: FY-2日次タブ末尾に翌FY（2026-04以降）の入力残骸があり、FY-3タブと二重計上されていた（2026-04で¥241,916など計¥483,696）。
 - **対処**: `gen_import.py` に日次タブのFY日付範囲ガードを追加（FY-2=2025-04〜2026-03、FY-3=2026-04〜2027-03のみ）。範囲外は除外し警告出力。
   本番の既投入分は `data/fix-fy2-leak.sql`（`imp:d2:` かつ 2026-04以降を削除）で掃除する。冪等なので再実行安全。
+  （2026-11-23 `db/cleanup/000_fix_fy2_leak.sql` に移動し、カットオーバー用スクリプトと一緒に管理）
 - **状態**: ローカル修正・再突合NG0件。**本番は `data/fix-fy2-leak.sql` の実行待ち**。
+  → 2026-11-23 確認：本番に該当行は0件（適用済み）。クローズ（ADR-057）。
 
 ## ADR-048 | 2026-07-20 | 口座・カード・電子マネーのマスタ管理（一般ユーザー対応）
 - **決定**: `/wallets`（設定＞マスタ管理）でウォレットを全種別CRUD。銀行/電子マネー/ポイント/現金/暗号資産に加え、
@@ -644,13 +646,51 @@
   ECR `pl-app`／CodeBuild `pl-app-build`／S3 `pl-app-build-616532575651`／Lambda `pl-app-stop-rds`／EventBridge `pl-app-nightly-stop`／
   IAMロール ×5（apprunner-ecr・apprunner-instance・codebuild・github-actions・lambda-stop）／GitHub OIDCプロバイダ／
   SG `pl-db-sg`・`pl-apprunner-sg`／CloudWatch Logs（apprunner・codebuild・lambda）。
-- **残したもの**: 予算アラート `pl-app-monthly`（無料の安全網）。リポジトリの `Dockerfile`・`.dockerignore`・`buildspec.yml`・
-  `infra/lambda/stop_rds.py`・`docs/aws-deployment.md`・`.github/workflows/deploy-aws.yml`（push トリガーを外し手動実行のみ＝再構築のひな形）。
+- **残したもの**: 予算アラート `pl-app-monthly`（無料の安全網）と `docs/aws-deployment.md`（手順書）。
+  リポジトリの `Dockerfile`・`.dockerignore`・`buildspec.yml`・`infra/lambda/stop_rds.py`・`.github/workflows/deploy-aws.yml`・`src.zip` は
+  フォルダ整理（2026-11-23）で削除。再構築時は `git checkout e657c89 -- Dockerfile .dockerignore buildspec.yml infra .github` で復元できる。
 - **手作業で残る後始末**: Google Cloud Console の承認済みリダイレクトURIから
   `https://mnuwnhxg9c.ap-northeast-1.awsapprunner.com/api/auth/google/callback` を削除する（ユーザー作業）。
 - **再構築時の注意**: パブリックIPv4課金（$0.005/時）を前提に見積もる。DBを外部公開しない構成（VPCコネクタ＋NAT、または
   Aurora Serverless v2 等）か、学習の間だけ作って終わったら消す使い方を検討する。
 - **状態**: 実施済み（2026-11-23）。
+
+## ADR-057 | 2026-11-23 | 本番運用開始を 2026-12-01 に変更し、本番データを整理（カットオーバー①）
+- **背景**: 10/1 に予定していた並行運用は始まっておらず、本番で最後に手入力されたのは 2026-07-20（8月以降はほぼ入力なし）。
+  ユーザーの意向で、**2026-12-01 からアプリを本格運用する**。ADR-054 のカットオーバー用スクリプトは本番で未実行だった。
+- **本番の調査結果（2026-11-23・読み取り専用で実施）**:
+  - FY-2二重取込（ADR-045 追補 / `db/cleanup/000_fix_fy2_leak.sql`）: 該当0件＝適用済み。
+  - DEMOデータ: 2026-06 に11件・¥635,300（ローカルの記録 ¥645,300 とは差がある）。うち1件は脚2本。
+  - 未来日付の取込行: 「1人体験」¥40,700 が 10/1・11/1・12/1 の3件（FY-3日次・脚なし）。
+  - 7〜11月の実データはアプリに無い（取込のカットオフ 2026-07 以降はシート側のみで管理されていた）。
+  - 他ユーザー2名は取引0件。`uq_card_settlement`（migrations/007）は本番に作成済み。
+- **実施したこと**:
+  1. バックアップ：本番の全16テーブルを CSV で `backups/neon_2026-11-23_2231/` に退避（件数一致を確認）。
+     本番は PostgreSQL 18、手元の `pg_dump` は 17 で互換が無いため CSV 方式にした。
+     削除対象は `deleted_transactions.csv` / `deleted_transaction_legs.csv` に別途退避し、
+     本番上で読み戻して差分0件を確認（ROLLBACK で実施）。
+  2. 削除：DEMO 11件と、12/1 の取込行1件（計12件・脚12件は CASCADE）。件数ガード付きトランザクションで実行し、
+     取引 2,221 → 2,209 件。
+- **7〜11月のシート再取込（同日・ユーザー承認のうえ実施）**: 2026-11-23 書き出しの最新シートから、カットオフ 2026-12-01 で再取込。
+  - **取込ツールの不具合を修正**: 新しい書き出しでは日付セルが Excel シリアル値ではなく datetime で来るため、
+    日次タブ・FY-1タブを全て読み飛ばしていた。そのまま流すと日次0件のせいで「月次調整」に変動費の全額が入り、
+    2025-04〜2026-06 の変動費が二重計上になるところだった。`to_date()` で両形式を受け付けるよう修正し、
+    7月のシートから7月と完全に同一の SQL が生成されること（回帰）を確認した。
+  - **月末が未到来の残高は取り込まない**ようにした（月途中に書き出したシートの 11/30 残高を入れない。実残高は /reconcile が正）。
+  - `ON CONFLICT DO NOTHING` では「シートで後から直した既存行」「シートから消えた行」が反映されないため、
+    `db/import/compare_import.py`（突合）と `db/import/build_apply.py`（ガード付き適用SQL生成）を追加した。
+  - 反映内容: 取引追加540件（7〜11/22の日次、7〜10月の固定費・収入）／見込み額→実額の修正7件／
+    シートから消えた行の削除9件（7月末の見込み5件、「1人体験」¥40,700 の 8/1・9/1・10/1・11/1）／
+    残高 53件（7〜10月末）／給与明細3件（8〜10月）／目標額の更新10件（2026-11〜2027-03）。
+    取引 2,209 → 2,740件。直前バックアップは `backups/neon_2026-11-23_2244_before-import/`。
+  - 検証: 再突合で差分0件、`validate.py`（本番向け）で月次合計 NG 0件。
+- **残り（カットオーバー②・12/1）**: 順番が重要。
+  1. ユーザーがシートで11月を確定し、xlsx を書き出す。
+  2. ユーザーが `/reconcile` に 11/30 時点の実残高を入力する（取込より先。取込の残高は DO NOTHING なので手入力が優先される）。
+  3. `PL_CUTOFF=2026-12-01` で再生成 → `compare_import.py` → CSVバックアップ → `build_apply.py` の apply.sql を適用（11月の残り分）。
+  4. `db/cleanup/002_sync_initial_balance.sql` を本番で実行し、/reconcile の差分0を確認する。
+  5. `.env.neon.local` を削除する。
+- **戻し方**: 削除した12件は、上記CSVを `\copy` で transactions → transaction_legs の順に INSERT すれば元に戻る（id も保持）。
 
 ## 要確認リスト（クローズ済み・2026-07-19棚卸し）
 - ビジョン/目標レイヤー → ✅ `/vision`（自由記述の箱・vision_notes）として実装済み。予実/資産目標との数値連動は将来検討（roadmap）。
